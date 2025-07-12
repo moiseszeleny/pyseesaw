@@ -12,12 +12,12 @@ import sys
 import os
 
 # Add src directory to path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from matrix_utils import (diagonalize_hermitian_matrix, diagonalize_mass_matrix,
+from src.matrix_utils import (diagonalize_hermitian_matrix, diagonalize_mass_matrix,
                          check_unitarity, mass_squared_differences, 
                          enforce_mass_ordering, matrix_condition_number)
-from pmns_matrix import pmns_matrix_standard, extract_mixing_angles, jarlskog_invariant
+from src.pmns_matrix import pmns_matrix_standard, extract_mixing_angles, jarlskog_invariant
 
 
 def demonstrate_diagonalization():

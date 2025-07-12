@@ -13,11 +13,11 @@ import sys
 import os
 
 # Add src directory to path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from seesaw import SymbolicSeesawTypeI
-from inverse_seesaw import SymbolicInverseSeesaw
-from matrix_utils import create_symbolic_matrix, substitute_numerical_values
+from src.seesaw import SymbolicSeesawTypeI
+from src.inverse_seesaw import SymbolicInverseSeesaw
+from src.matrix_utils import create_symbolic_matrix, substitute_numerical_values
 
 # Configure SymPy for nice output
 sp.init_printing(use_latex=False, use_unicode=True)

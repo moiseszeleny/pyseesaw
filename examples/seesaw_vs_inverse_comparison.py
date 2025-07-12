@@ -14,12 +14,12 @@ import sys
 import os
 
 # Add src directory to path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from .seesaw import SeesawTypeI
-from .inverse_seesaw import InverseSeesaw, compare_seesaw_vs_inverse_seesaw
-from .pmns_matrix import pmns_from_experimental, extract_mixing_angles
-from .visualization import (plot_mass_spectrum, compare_mass_spectra, 
+from src.seesaw import SeesawTypeI
+from src.inverse_seesaw import InverseSeesaw, compare_seesaw_vs_inverse_seesaw
+from src.pmns_matrix import pmns_from_experimental, extract_mixing_angles
+from src.visualization import (plot_mass_spectrum, compare_mass_spectra, 
                           plot_mixing_matrix, create_summary_report)
 
 
