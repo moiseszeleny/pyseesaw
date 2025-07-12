@@ -200,7 +200,7 @@ def experimental_values_2023() -> Dict[str, Dict[str, float]]:
     # Users should update with latest experimental results
     
     values = {
-        'normal_ordering': {
+        'normal': {
             'theta12_deg': 33.45,  # Solar angle
             'theta13_deg': 8.62,   # Reactor angle  
             'theta23_deg': 49.2,   # Atmospheric angle
@@ -208,7 +208,7 @@ def experimental_values_2023() -> Dict[str, Dict[str, float]]:
             'dm21_sq_1e5': 7.42,   # Δm²₂₁ × 10⁵ eV²
             'dm3l_sq_1e3': 2.515,  # Δm²₃ₗ × 10³ eV² (l=1 for NO)
         },
-        'inverted_ordering': {
+        'inverted': {
             'theta12_deg': 33.45,
             'theta13_deg': 8.65,
             'theta23_deg': 49.5,

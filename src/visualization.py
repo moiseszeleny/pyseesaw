@@ -6,10 +6,16 @@ mixing matrices, and comparison between different Seesaw mechanisms.
 """
 
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
 import matplotlib.pyplot as plt
 import seaborn as sns
 from typing import Dict, List, Optional, Tuple
 import pandas as pd
+import warnings
+
+# Suppress matplotlib warnings about non-interactive backend
+warnings.filterwarnings('ignore', message='FigureCanvasAgg is non-interactive')
 
 
 def plot_mass_spectrum(masses: np.ndarray, 
@@ -59,8 +65,18 @@ def plot_mass_spectrum(masses: np.ndarray,
     
     if save_path:
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        print(f"Plot saved to: {save_path}")
+    else:
+        # Save to default location if no path specified
+        default_path = f"mass_spectrum_{mechanism_name.replace(' ', '_').lower()}.png"
+        plt.savefig(default_path, dpi=300, bbox_inches='tight')
+        print(f"Plot saved to: {default_path}")
     
-    plt.show()
+    # Only show if in interactive mode
+    if matplotlib.get_backend() != 'Agg':
+        plt.show()
+    
+    plt.close()  # Close figure to free memory
 
 
 def plot_mixing_matrix(mixing_matrix: np.ndarray,
@@ -122,8 +138,18 @@ def plot_mixing_matrix(mixing_matrix: np.ndarray,
     
     if save_path:
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        print(f"Plot saved to: {save_path}")
+    else:
+        # Save to default location if no path specified
+        default_path = f"mixing_matrix_{mechanism_name.replace(' ', '_').lower()}.png"
+        plt.savefig(default_path, dpi=300, bbox_inches='tight')
+        print(f"Plot saved to: {default_path}")
     
-    plt.show()
+    # Only show if in interactive mode
+    if matplotlib.get_backend() != 'Agg':
+        plt.show()
+    
+    plt.close()  # Close figure to free memory
 
 
 def compare_mass_spectra(comparison_results: Dict, 
@@ -149,7 +175,19 @@ def compare_mass_spectra(comparison_results: Dict,
         axes = [axes]
     
     for i, mechanism in enumerate(mechanisms):
-        masses = comparison_results[mechanism]['masses']
+        # Try different possible keys for masses based on the data structure
+        if 'light_masses' in comparison_results[mechanism]:
+            masses = comparison_results[mechanism]['light_masses']
+        elif 'masses' in comparison_results[mechanism]:
+            masses = comparison_results[mechanism]['masses']
+        elif 'neutrino_masses' in comparison_results[mechanism]:
+            masses = comparison_results[mechanism]['neutrino_masses']
+        else:
+            # Print available keys for debugging and skip this mechanism
+            print(f"Warning: No mass data found for {mechanism}")
+            print(f"Available keys: {list(comparison_results[mechanism].keys())}")
+            continue
+            
         sorted_masses = np.sort(np.abs(masses))
         
         bars = axes[i].bar(range(len(sorted_masses)), sorted_masses,
@@ -175,8 +213,18 @@ def compare_mass_spectra(comparison_results: Dict,
     
     if save_path:
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        print(f"Plot saved to: {save_path}")
+    else:
+        # Save to default location if no path specified
+        default_path = "mass_spectra_comparison.png"
+        plt.savefig(default_path, dpi=300, bbox_inches='tight')
+        print(f"Plot saved to: {default_path}")
     
-    plt.show()
+    # Only show if in interactive mode
+    if matplotlib.get_backend() != 'Agg':
+        plt.show()
+    
+    plt.close()  # Close figure to free memory
 
 
 def plot_mass_squared_differences(comparison_results: Dict,
@@ -246,8 +294,18 @@ def plot_mass_squared_differences(comparison_results: Dict,
     
     if save_path:
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        print(f"Plot saved to: {save_path}")
+    else:
+        # Save to default location if no path specified
+        default_path = "mass_squared_differences.png"
+        plt.savefig(default_path, dpi=300, bbox_inches='tight')
+        print(f"Plot saved to: {default_path}")
     
-    plt.show()
+    # Only show if in interactive mode
+    if matplotlib.get_backend() != 'Agg':
+        plt.show()
+    
+    plt.close()  # Close figure to free memory
 
 
 def plot_parameter_space_scan(parameter_range: np.ndarray,
@@ -291,8 +349,18 @@ def plot_parameter_space_scan(parameter_range: np.ndarray,
     
     if save_path:
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        print(f"Plot saved to: {save_path}")
+    else:
+        # Save to default location if no path specified
+        default_path = f"parameter_scan_{parameter_name.replace(' ', '_').lower()}.png"
+        plt.savefig(default_path, dpi=300, bbox_inches='tight')
+        print(f"Plot saved to: {default_path}")
     
-    plt.show()
+    # Only show if in interactive mode
+    if matplotlib.get_backend() != 'Agg':
+        plt.show()
+    
+    plt.close()  # Close figure to free memory
 
 
 def plot_unitarity_triangle(pmns_matrix: np.ndarray,
@@ -345,8 +413,18 @@ def plot_unitarity_triangle(pmns_matrix: np.ndarray,
     
     if save_path:
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        print(f"Plot saved to: {save_path}")
+    else:
+        # Save to default location if no path specified
+        default_path = "unitarity_triangles.png"
+        plt.savefig(default_path, dpi=300, bbox_inches='tight')
+        print(f"Plot saved to: {default_path}")
     
-    plt.show()
+    # Only show if in interactive mode
+    if matplotlib.get_backend() != 'Agg':
+        plt.show()
+    
+    plt.close()  # Close figure to free memory
 
 
 def create_summary_report(comparison_results: Dict,
@@ -374,7 +452,17 @@ def create_summary_report(comparison_results: Dict,
     
     for mechanism in mechanisms:
         result = comparison_results[mechanism]
-        masses = result['masses']
+        
+        # Try different possible keys for masses
+        if 'light_masses' in result:
+            masses = result['light_masses']
+        elif 'masses' in result:
+            masses = result['masses']
+        elif 'neutrino_masses' in result:
+            masses = result['neutrino_masses']
+        else:
+            print(f"Warning: No mass data found for {mechanism}")
+            continue
         
         # Calculate some summary statistics
         row = {
