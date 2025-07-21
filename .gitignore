@@ -181,6 +181,7 @@ plots/
 figures/
 *.eps
 *.pdf
+*.png
 !documentation.pdf
 
 # Temporary files

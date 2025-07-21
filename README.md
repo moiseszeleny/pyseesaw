@@ -1,5 +1,7 @@
 # Neutrino Mass Matrix Research Project
 
+**Version 0.1.0**
+
 A comprehensive Python package for exploring neutrino mass generation mechanisms, focusing on the Seesaw and Inverse Seesaw mechanisms. This project combines symbolic analysis with numerical calculations to provide deep insights into the physics of neutrino masses.
 
 ## 🔬 Features
@@ -42,16 +44,29 @@ examples/
 └── symbolic_seesaw_analysis.py        # Symbolic analysis examples
 
 notebooks/
-└── neutrino_mass_exploration.ipynb    # Interactive Jupyter notebook
+├── neutrino_mass_exploration.ipynb    # Interactive Jupyter notebook
+├── seesaw_2_active_1_sterile.ipynb    # 2+1 neutrino scenario
+├── seesaw_3_active_1_sterile.ipynb    # 3+1 neutrino scenario  
+└── seesaw_one_generation.ipynb        # Single generation analysis
 
 tests/
 └── test_matrix_utils.py               # Unit tests
 ```
 
+> **Note**: The package is currently in development. Examples use direct `src.` imports with path modifications. Future versions will support standard `import pyseesaw` package imports.
+
 ## 🚀 Quick Start
 
-### 1. Install Dependencies
+### 1. Install the Package
 
+**For development (recommended):**
+```bash
+git clone https://github.com/moiseszeleny/pyseesaw.git
+cd pyseesaw
+pip install -e .
+```
+
+**Install dependencies:**
 ```bash
 pip install -r requirements.txt
 ```
@@ -60,6 +75,7 @@ pip install -r requirements.txt
 
 **Compare Seesaw mechanisms:**
 ```bash
+cd pyseesaw  # Ensure you're in the project root
 python examples/seesaw_vs_inverse_comparison.py
 ```
 
@@ -68,15 +84,31 @@ python examples/seesaw_vs_inverse_comparison.py
 python examples/symbolic_seesaw_analysis.py
 ```
 
+**Matrix analysis demo:**
+```bash
+python examples/matrix_analysis_demo.py
+```
+
 **Interactive exploration:**
 ```bash
 jupyter notebook notebooks/neutrino_mass_exploration.ipynb
+# Or explore specific scenarios:
+jupyter notebook notebooks/seesaw_2_active_1_sterile.ipynb
+jupyter notebook notebooks/seesaw_3_active_1_sterile.ipynb
+jupyter notebook notebooks/seesaw_one_generation.ipynb
 ```
 
 ### 3. Basic Usage
 
+**Current usage (using direct module imports):**
 ```python
 import numpy as np
+import sys
+import os
+
+# Add project root to path for development
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from src.seesaw import SymbolicSeesawTypeI, SeesawTypeI
 from src.inverse_seesaw import SymbolicInverseSeesaw, InverseSeesaw
 
@@ -90,6 +122,16 @@ m_D = 1e-2 * np.random.rand(3, 3)  # Dirac masses (GeV)
 M_R = 1e15 * np.eye(3)             # Heavy masses (eV)
 seesaw = SeesawTypeI(m_D, M_R)
 masses, mixing = seesaw.diagonalize_light_sector()
+```
+
+**Intended package usage (when package structure is fixed):**
+```python
+import numpy as np
+import pyseesaw
+from pyseesaw.seesaw import SymbolicSeesawTypeI, SeesawTypeI
+from pyseesaw.inverse_seesaw import SymbolicInverseSeesaw, InverseSeesaw
+
+# Same usage as above...
 ```
 
 ## 🧮 Physics Background
@@ -145,7 +187,13 @@ Where:
 
 ### 1. Pedagogical Analysis
 ```python
+import sys
+import os
+# Add project root to path for development
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 # Understand Seesaw mechanism step-by-step
+from src.seesaw import SymbolicSeesawTypeI
 symbolic_seesaw = SymbolicSeesawTypeI()
 case_2x2 = symbolic_seesaw.simplified_2x2_case()
 print("2×2 mass matrix:")
@@ -155,7 +203,7 @@ print(case_2x2['mass_matrix'])
 ### 2. Phenomenological Studies
 ```python
 # Compare with experimental data
-from src.pmns_matrix import pmns_from_experimental
+from src.pmns_matrix import pmns_from_experimental, extract_mixing_angles
 exp_pmns = pmns_from_experimental('normal')
 theta12_exp, theta13_exp, theta23_exp, delta_exp = extract_mixing_angles(exp_pmns)
 ```
@@ -163,6 +211,7 @@ theta12_exp, theta13_exp, theta23_exp, delta_exp = extract_mixing_angles(exp_pmn
 ### 3. Model Building
 ```python
 # Test different textures
+from src.seesaw import SymbolicSeesawTypeI
 seesaw = SymbolicSeesawTypeI()
 seesaw.set_texture(dirac_texture=[(0,1), (1,0)])  # No 1-2 mixing
 m_textured = seesaw.light_mass_matrix_symbolic()
@@ -188,17 +237,23 @@ m_textured = seesaw.light_mass_matrix_symbolic()
 
 Run the test suite:
 ```bash
-python -m pytest tests/ -v
+python tests/test_matrix_utils.py
 ```
 
-Test specific modules:
+Or install pytest for more comprehensive testing:
 ```bash
-python tests/test_matrix_utils.py
+pip install pytest
+python -m pytest tests/ -v
 ```
 
 ## 🤝 Contributing
 
 This project is designed for neutrino physics research and education. Contributions are welcome!
+
+**Current Development Priority:**
+- Fixing package import structure for standard `import pyseesaw` usage
+- Adding more comprehensive tests
+- Improving documentation
 
 ### Areas for Contribution
 - Additional Seesaw mechanisms (e.g., radiative)
@@ -206,6 +261,7 @@ This project is designed for neutrino physics research and education. Contributi
 - Cosmological implications
 - Machine learning applications
 - Educational materials
+- Package structure improvements
 
 ## 📖 References
 
