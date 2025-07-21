@@ -1,10 +1,119 @@
 """
-Implementation of various Seesaw mechanisms for neutrino mass generation.
+Implementation of Seesaw Mechanisms for Neutrino Mass Generation
 
-This module implements the Type I, Type II, and Type III Seesaw mechanisms,
-which explain the smallness of neutrino masses through the introduction
-of heavy particles at high energy scales. Uses SymPy for symbolic analysis
-and step-by-step approximations.
+This module implements the three main types of Seesaw mechanisms that explain
+the smallness of neutrino masses through the introduction of heavy particles
+at high energy scales. Each mechanism provides a natural explanation for why
+neutrinos are so much lighter than other fermions.
+
+## Physics Background and Motivation
+
+### The Neutrino Mass Puzzle:
+Standard Model fermions span a huge mass range:
+- Top quark: ~173 GeV  
+- Electron: ~0.511 MeV
+- Neutrinos: < 0.1 eV (over 10 million times lighter than the electron!)
+
+This enormous hierarchy suggests neutrino masses arise through a fundamentally
+different mechanism than charged fermion masses.
+
+### The Seesaw Principle:
+All Seesaw mechanisms are based on the general idea:
+
+    Light mass ~ (Medium scale)² / (Heavy scale)
+
+This "seesaw" relationship naturally explains small neutrino masses if there
+exist heavy particles with masses much larger than the electroweak scale.
+
+## Type I Seesaw Mechanism
+
+**Physical Setup:**
+- Introduces heavy right-handed neutrinos νᴿ with masses M_R >> v_EW
+- Dirac mass terms m_D connect left-handed νᴸ to right-handed νᴿ  
+- After heavy state integration: m_ν = -m_D M_R⁻¹ m_D^T
+
+**Mass Matrix Structure:**
+In the (νᴸ, νᴿ) basis:
+```
+M = | 0     m_D  |
+    | m_D^T  M_R |
+```
+
+**Physical Scales:**
+- m_D ~ O(100 GeV): Dirac masses at electroweak scale
+- M_R ~ O(10¹⁰⁻¹⁶ GeV): Right-handed masses at high scale
+- m_ν ~ m_D²/M_R ~ O(0.01-0.1 eV): Light neutrino masses
+
+**Advantages:**
+- Minimal: only adds right-handed neutrinos
+- Natural: no fine-tuning required
+- Connects to GUT scale physics
+
+## Type II Seesaw Mechanism  
+
+**Physical Setup:**
+- Introduces Higgs triplet field Δ with small VEV v_T
+- Direct Majorana mass term: m_ν = f v_T
+- Can combine with Type I for richer phenomenology
+
+**Key Feature:**
+- Light neutrino masses directly proportional to triplet VEV
+- Natural in left-right symmetric models
+- Can have interesting CP violation patterns
+
+**Combined Type I+II:**
+m_ν = f v_T - m_D M_R⁻¹ m_D^T
+
+## Type III Seesaw Mechanism
+
+**Physical Setup:**
+- Uses heavy fermionic triplets Σ instead of singlet right-handed neutrinos
+- Same mathematical structure as Type I: m_ν = -m_D M_Σ⁻¹ m_D^T  
+- Triplets can be produced at colliders (potentially testable)
+
+**Physical Advantages:**
+- Potentially observable at LHC due to triplet quantum numbers
+- Same naturalness as Type I
+- Different model building possibilities
+
+## Phenomenological Implications
+
+### Mass Hierarchies:
+- Normal ordering: m₁ < m₂ < m₃ (favored by current data)
+- Inverted ordering: m₃ < m₁ < m₂ (disfavored but not ruled out)
+
+### Mixing Patterns:
+- Large θ₁₂ (solar): ~33°
+- Small θ₁₃ (reactor): ~8.6°  
+- Near-maximal θ₂₃ (atmospheric): ~49°
+
+### CP Violation:
+- Dirac phase δ_CP ~ 197° (normal ordering)
+- Majorana phases α₁, α₂ (unmeasured in oscillations)
+
+## Experimental Connections
+
+### Direct Tests:
+- Neutrinoless double beta decay: depends on |⟨m_ββ⟩|
+- Cosmological constraints: Σmᵢ < 0.12 eV
+- Tritium decay: direct kinematic mass measurement
+
+### Indirect Tests:
+- Neutrino oscillation experiments measure Δm² and mixing angles
+- Consistency checks with Seesaw predictions
+- Leptogenesis: connects to matter-antimatter asymmetry
+
+## Computational Features
+
+This module provides both symbolic and numerical tools:
+- **Symbolic analysis**: Exact formulas with SymPy for pedagogical understanding
+- **Numerical evaluation**: Realistic parameter studies with NumPy
+- **Phenomenological tools**: Comparison with experimental data
+- **Visualization**: Mass spectra and mixing pattern plots
+
+All implementations follow standard physics conventions and include proper
+error handling for the numerical challenges inherent in neutrino physics
+(widely separated mass scales, near-degeneracies, etc.).
 """
 
 import numpy as np
@@ -490,13 +599,75 @@ class SymbolicSeesawTypeI:
 
 class SeesawTypeI:
     """
-    Type I Seesaw mechanism implementation.
+    Numerical implementation of the Type I Seesaw mechanism.
     
-    In Type I Seesaw, the light neutrino mass matrix is given by:
+    The Type I Seesaw is the most minimal and widely studied mechanism for
+    generating small neutrino masses. It introduces heavy right-handed neutrinos
+    that mix with the Standard Model left-handed neutrinos through Dirac mass terms.
+    
+    ## Physics Framework
+    
+    **Lagrangian Terms:**
+    ℒ = -ν̄ᴸ m_D νᴿ - ½ (ν̄ᴿ)ᶜ M_R νᴿ + h.c.
+    
+    **Mass Matrix in (νᴸ, νᴿ) basis:**
+    ```
+    M = | 0     m_D  |
+        | m_D^T  M_R |
+    ```
+    
+    **Effective Light Neutrino Mass:**
+    When M_R >> m_D, integrating out heavy modes gives:
     m_ν = -m_D M_R⁻¹ m_D^T
     
-    where m_D is the Dirac mass matrix and M_R is the right-handed
-    Majorana mass matrix.
+    ## Parameter Ranges and Physical Scales
+    
+    **Dirac Mass Matrix m_D:**
+    - Elements typically O(10⁻⁶ - 1) × v_EW where v_EW = 246 GeV
+    - Reflects Yukawa couplings to Higgs field
+    - Can have texture zeros or specific patterns from flavor models
+    - Range: ~1 keV to ~100 GeV depending on model
+    
+    **Majorana Mass Matrix M_R:**
+    - Right-handed neutrino masses, typically >> v_EW
+    - Natural scale: 10¹⁰ - 10¹⁶ GeV (intermediate to GUT scale)
+    - Must be positive definite for stability
+    - Can be diagonal or have off-diagonal structure
+    
+    **Resulting Light Masses:**
+    - m_ν ~ m_D²/M_R ~ 0.001 - 0.1 eV (observed range)
+    - Squared mass differences: Δm²₂₁ ~ 7.4×10⁻⁵ eV², Δm²₃₁ ~ 2.5×10⁻³ eV²
+    
+    ## Physical Predictions
+    
+    **Mass Hierarchy:**
+    The sign and structure of m_D and M_R determine:
+    - Mass ordering (normal vs inverted)
+    - Mass degeneracy patterns
+    - Absolute mass scale
+    
+    **Mixing Angles:**
+    Complex interplay between m_D structure and M_R diagonalization:
+    - Solar angle θ₁₂ ~ 33° (large mixing)
+    - Reactor angle θ₁₃ ~ 8.6° (small but non-zero)
+    - Atmospheric angle θ₂₃ ~ 49° (near maximal)
+    
+    **CP Violation:**
+    - Dirac phase δ_CP from complex elements in m_D or M_R
+    - Majorana phases α₁, α₂ (physical in neutrinoless double beta decay)
+    
+    ## Experimental Connections
+    
+    **Testable Predictions:**
+    - Neutrino oscillation parameters (already measured)
+    - Neutrinoless double beta decay rate
+    - Cosmological constraints on neutrino mass sum
+    - Possible signatures of heavy neutrinos at colliders
+    
+    **Model Building:**
+    - Connection to grand unified theories (GUTs)
+    - Leptogenesis and baryogenesis
+    - Dark matter candidates (sterile neutrinos)
     """
     
     def __init__(self, dirac_mass: np.ndarray, majorana_mass: np.ndarray):

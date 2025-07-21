@@ -1,10 +1,135 @@
 """
-Implementation of the Inverse Seesaw mechanism for neutrino mass generation.
+Implementation of the Inverse Seesaw Mechanism for Neutrino Mass Generation
 
-The Inverse Seesaw mechanism provides an alternative way to generate
-small neutrino masses with naturally small lepton number violation,
-characterized by a small parameter μ rather than large mass scales.
-Uses SymPy for symbolic analysis to demonstrate the mechanism step-by-step.
+The Inverse Seesaw mechanism provides an alternative approach to generating small
+neutrino masses that is more "natural" than the standard Seesaw mechanisms.
+Instead of relying on extremely heavy mass scales, it uses a small parameter μ
+that explicitly breaks lepton number by a tiny amount.
+
+## Physics Motivation and Advantages
+
+### Problems with Standard Seesaw:
+- Requires extremely heavy masses M_R ~ 10¹⁰⁻¹⁶ GeV (untestable scales)
+- Large hierarchy between electroweak and Seesaw scales
+- Heavy neutrinos completely decouple from low-energy physics
+
+### Inverse Seesaw Solution:
+- Allows heavy neutrinos at TeV scale (potentially observable)
+- Small neutrino masses from small lepton number violation μ
+- More natural fine-tuning (linear in μ rather than quadratic in M_R)
+- Richer phenomenology with light sterile states
+
+## Physical Framework
+
+### Extended Particle Content:
+- Standard left-handed neutrinos νᴸ
+- Right-handed neutrinos Nᴿ (can be at TeV scale)
+- Additional sterile neutrinos S (singlets under Standard Model)
+
+### Lagrangian Structure:
+ℒ = -ν̄ᴸ m_D Nᴿ - ½(N̄ᴿ)ᶜ M_R Nᴿ - ½(N̄ᴿ)ᶜ μ Sᴸ - ½(S̄ᴸ)ᶜ μ† Nᴿ + h.c.
+
+### Mass Matrix in (νᴸ, Nᴿ, Sᴸ) basis:
+```
+M = | 0     m_D    0   |
+    | m_D^T   0    M_R |
+    | 0     M_R^T   μ  |
+```
+
+### Key Parameters:
+- **m_D**: Dirac masses (~ GeV scale, similar to quark/lepton masses)
+- **M_R**: Right-handed masses (TeV scale, potentially accessible)  
+- **μ**: Lepton number violation (keV scale, naturally small)
+
+## Mathematical Structure and Approximations
+
+### Exact Diagonalization:
+The 6×6 mass matrix (for 3 generations) can be diagonalized exactly,
+yielding 3 light and 3 heavy mass eigenstates.
+
+### Analytic Approximation (μ << M_R):
+In the limit where μ is much smaller than other scales:
+
+**Light neutrino masses:**
+m_ν ≈ m_D M_R⁻¹ μ (M_R^T)⁻¹ m_D^T
+
+**Heavy neutrino masses:**
+M_heavy ≈ M_R (with small corrections ~ μ/M_R)
+
+### Scaling Behavior:
+- Light masses scale **linearly** with μ: m_ν ∝ μ
+- This is more natural than standard Seesaw: m_ν ∝ 1/M_R
+- Small μ ~ keV naturally gives sub-eV neutrino masses
+
+## Physical Scales and Naturalness
+
+### Typical Parameter Values:
+- **Dirac masses m_D**: 0.1 - 10 GeV (electroweak scale)
+- **Heavy masses M_R**: 100 GeV - 10 TeV (LHC accessible)
+- **LNV parameter μ**: 1 keV - 1 MeV (naturally small)
+- **Light masses m_ν**: 0.01 - 0.1 eV (observed range)
+
+### Naturalness Argument:
+The "naturalness parameter" η = μ/M_R can be small (η ~ 10⁻⁶) without
+extreme fine-tuning, unlike standard Seesaw where m_D/M_R ~ 10⁻¹².
+
+### Connection to Symmetries:
+- μ = 0 corresponds to exact lepton number conservation
+- Small μ represents small breaking of lepton number symmetry
+- More theoretically motivated than large mass hierarchies
+
+## Phenomenological Implications
+
+### Neutrino Oscillations:
+- Light neutrino mixing determined by interplay of all three mass matrices
+- Can accommodate all observed oscillation data
+- Potentially different predictions than standard Seesaw
+
+### Heavy Neutrino Signatures:
+- Heavy states at TeV scale potentially observable at colliders
+- Modified W boson decays
+- Neutrinoless double beta decay with different rates
+
+### Sterile Neutrino Phenomenology:
+- Light sterile states from μ-mixing
+- Possible dark matter candidates
+- Modified Big Bang nucleosynthesis
+
+### Model Building Connections:
+- Natural in left-right symmetric models
+- Connection to radiative neutrino mass models
+- Supersymmetric implementations
+
+## Experimental Tests and Signatures
+
+### Direct Searches:
+- Heavy neutrino production at LHC
+- Displaced vertex signatures from long-lived heavy neutrinos
+- Modified electroweak precision measurements
+
+### Indirect Constraints:
+- Neutrinoless double beta decay (different matrix elements)
+- Lepton flavor violation processes
+- Cosmological constraints on extra relativistic degrees of freedom
+
+### Future Prospects:
+- Higher energy colliders for heavier M_R
+- Precision measurements of light neutrino properties
+- Improved neutrinoless double beta decay sensitivity
+
+## Computational Features
+
+This module provides comprehensive tools for Inverse Seesaw analysis:
+- **Exact symbolic calculations**: Full 6×6 mass matrix treatment
+- **Analytic approximations**: Fast evaluation in μ << M_R limit  
+- **Numerical diagonalization**: Robust algorithms for realistic parameters
+- **Parameter space studies**: Exploration of allowed regions
+- **Phenomenological predictions**: Comparison with experimental data
+
+All implementations handle the numerical challenges of the Inverse Seesaw:
+- Multiple widely separated mass scales
+- Near-singular matrices in certain limits
+- Proper treatment of complex phases and unitarity
 """
 
 import numpy as np
