@@ -13,6 +13,93 @@ from scipy.linalg import eigh, svd
 from typing import Tuple, Optional, Union
 import warnings
 
+def sin_cos_from_tan_fraction(tan_expression: sp.Expr) -> Tuple[sp.Expr, sp.Expr]:
+    """
+    Convert a tangent expression to sine and cosine using its fractional representation.
+
+    Assumes that `tan_expression` is a SymPy fraction representing tan(theta) = opposite/adjacent.
+
+    Parameters:
+    -----------
+    tan_expression : sp.Expr
+        Expression representing tan(theta) as a fraction
+
+    Returns:
+    --------
+    Tuple[sp.Expr, sp.Expr]
+        (sin(theta), cos(theta)) as SymPy expressions
+    """
+    # tan(theta) = sin(theta) / cos(theta)
+    # We can express sin and cos in terms of tan
+    cathetus_opposite, cathetus_adjacent = sp.fraction(tan_expression)
+    hypotenuse = sp.sqrt(cathetus_adjacent**2 + cathetus_opposite**2)
+    sin_theta = cathetus_opposite / hypotenuse
+    cos_theta = cathetus_adjacent / hypotenuse
+    return sin_theta, cos_theta
+
+def symbolic_rotation_matrix(dim: int, axis: int, angle: Union[float, sp.Symbol]) -> sp.Matrix:
+    """
+    Create a symbolic rotation matrix in n-dimensional space.
+    
+    For dimensions 2 and 3, creates standard rotation matrices.
+    For dim > 3, creates rotation in the plane defined by coordinates (axis, axis+1).
+    
+    Parameters:
+    -----------
+    dim : int
+        Dimension of the rotation space
+    axis : int
+        For 2D/3D: axis of rotation (0 for x, 1 for y, 2 for z)
+        For >3D: defines rotation plane as (axis, axis+1), must be < dim-1
+    angle : float or sp.Symbol
+        Rotation angle in radians
+    
+    Returns:
+    --------
+    sp.Matrix
+        Symbolic rotation matrix in n-dimensional space.
+        
+    Notes:
+    ------
+    In dimensions > 3, rotations are more naturally defined in planes rather
+    than around axes. This function rotates in the plane spanned by the
+    coordinate axes (axis, axis+1).
+    """
+    if dim < 2:
+        raise ValueError("Dimension must be at least 2")
+    if dim <= 3 and (axis < 0 or axis >= dim):
+        raise ValueError("Invalid axis for rotation")
+    if dim > 3 and (axis < 0 or axis >= dim - 1):
+        raise ValueError(f"For {dim}D rotation, axis must be in range [0, {dim-2}] to define rotation plane")
+    if dim == 2:
+        # 2D rotation matrix
+        return sp.Matrix([[sp.cos(angle), -sp.sin(angle)],
+                          [sp.sin(angle), sp.cos(angle)]])
+    elif dim == 3:
+        # 3D rotation matrix around specified axis
+        if axis == 0:
+            return sp.Matrix([[1, 0, 0],
+                              [0, sp.cos(angle), -sp.sin(angle)],
+                              [0, sp.sin(angle), sp.cos(angle)]])
+        elif axis == 1:
+            return sp.Matrix([[sp.cos(angle), 0, sp.sin(angle)],
+                              [0, 1, 0],
+                              [-sp.sin(angle), 0, sp.cos(angle)]])
+        elif axis == 2:
+            return sp.Matrix([[sp.cos(angle), -sp.sin(angle), 0],
+                              [sp.sin(angle), sp.cos(angle), 0],
+                              [0, 0, 1]])
+    elif dim > 3:
+        # Higher dimensions: rotation in the plane defined by axes (axis, axis+1)
+        # For proper n-dimensional rotations, we should specify a plane rather than an axis
+        rotation_matrix = sp.eye(dim)
+        # Rotate in the plane defined by coordinates (axis, axis+1)
+        rotation_matrix[axis, axis] = sp.cos(angle)
+        rotation_matrix[axis, axis + 1] = -sp.sin(angle)
+        rotation_matrix[axis + 1, axis] = sp.sin(angle)
+        rotation_matrix[axis + 1, axis + 1] = sp.cos(angle)
+        return rotation_matrix
+
 
 def diagonalize_hermitian_matrix(matrix: np.ndarray, 
                                  check_hermitian: bool = True) -> Tuple[np.ndarray, np.ndarray]:

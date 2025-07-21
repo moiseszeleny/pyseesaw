@@ -37,12 +37,21 @@ class SymbolicSeesawTypeI:
         """
         self.n_gen = n_generations
         self.n_sterile = n_sterile
+        self.n_neutrinos = n_generations + n_sterile
         
         # Create symbolic matrices
         self.m_D_sym = create_symbolic_matrix('m_D', (n_generations, n_sterile))
         self.M_R_sym = create_symbolic_matrix('M_R', (n_sterile, n_sterile), 
                                             real=True, symmetric=True)
-        
+        # Initialize symbolic masses for all neutrinos
+        self.masses = sp.symbols(f'm_{{n_1:{n_generations + n_sterile + 1}}}', positive=True)
+
+        self.M_diag = sp.Matrix(
+            [
+                [self.masses[i] if i == j else 0 for i in range(n_generations + n_sterile)]
+                for j in range(n_generations + n_sterile)
+            ]
+        )        
         # Define symbolic parameters for scaling analysis
         self.v = sp.Symbol('v', real=True, positive=True)  # Higgs VEV
         self.Lambda = sp.Symbol('Lambda', real=True, positive=True)  # Heavy scale
@@ -53,6 +62,28 @@ class SymbolicSeesawTypeI:
         self._light_mass_symbolic = None
         self._full_mass_matrix_symbolic = None
     
+    def __str__(self):
+        return f"SymbolicSeesawTypeI(n_generations={self.n_gen}, n_sterile={self.n_sterile})"
+
+    def __repr__(self):
+        return f"SymbolicSeesawTypeI(n_generations={self.n_gen}, n_sterile={self.n_sterile})"
+
+    def neutrino_mass_differences_dummyes(self):
+        """
+        Create neutrino mass differences and return them as a dictionary with mass differences
+        and their corresponding dummy variable which represents a negative value.
+        """
+        mn = self.masses
+        mass_differences = {}
+        for i in range(self.n_neutrinos):
+            for j in range(i + 1, self.n_neutrinos):
+                if i != j and i < j:
+                    diff = mn[i] - mn[j]
+                    dummy_diff = sp.Dummy(f'D_{{{i + 1}{j + 1}}}', negative=True)
+                    mass_differences[diff] = dummy_diff
+        return mass_differences
+                
+
     def set_texture(self, dirac_texture: Optional[list] = None, 
                    majorana_texture: Optional[list] = None):
         """
@@ -93,6 +124,256 @@ class SymbolicSeesawTypeI:
         
         return self._light_mass_symbolic
     
+    def full_mass_matrix_symbolic(self) -> sp.Matrix:
+        """
+        Get symbolic full mass matrix for neutrino mass matrix analysis.
+        
+        The full mass matrix has the structure:
+        [ 0     m_D  ]
+        [ m_D^T M_R  ]
+        
+        Returns:
+        --------
+        sp.Matrix
+            Symbolic full mass matrix of dimension (n_gen + n_sterile) × (n_gen + n_sterile)
+        """
+        if self._full_mass_matrix_symbolic is None:
+            n_gen = self.n_gen
+            n_sterile = self.n_sterile
+            n_total = n_gen + n_sterile
+            mD = self.m_D_sym
+            MR = self.M_R_sym
+            
+            # Initialize the full mass matrix
+            full_matrix = sp.zeros(n_total, n_total)
+            
+            # Fill the matrix blocks
+            # Top-left block: zeros (n_gen × n_gen)
+            # Top-right block: m_D (n_gen × n_sterile)
+            for i in range(n_gen):
+                for j in range(n_sterile):
+                    full_matrix[i, n_gen + j] = mD[i, j]
+            
+            # Bottom-left block: m_D^T (n_sterile × n_gen)
+            for i in range(n_sterile):
+                for j in range(n_gen):
+                    full_matrix[n_gen + i, j] = mD[j, i]
+            
+            # Bottom-right block: M_R (n_sterile × n_sterile)
+            for i in range(n_sterile):
+                for j in range(n_sterile):
+                    full_matrix[n_gen + i, n_gen + j] = MR[i, j]
+            
+            self._full_mass_matrix_symbolic = full_matrix
+        
+        return self._full_mass_matrix_symbolic
+
+    def MDaggerM(self) -> sp.Matrix:
+        """
+        Calculate the product of the full mass matrix and its conjugate transpose.
+        
+        Returns:
+        --------
+        sp.Matrix
+            The product M^† * M, where M is the full mass matrix
+        """
+        M = self.full_mass_matrix_symbolic()
+        return sp.physics.quantum.Dagger(M) * M
+    
+    def MConjugateMT(self) -> sp.Matrix:
+        """
+        Calculate the product of the Hermitian conjugate of the full mass matrix and its transpose.
+        
+        Returns:
+        --------
+        sp.Matrix
+            The product M^* * M^T, where M is the full mass matrix
+        """
+        M = self.full_mass_matrix_symbolic()
+        return sp.conjugate(M) * M.T
+    
+    def charpoly_relations(self, substitutions: dict = None) -> Dict[str, sp.Expr]:
+        """
+        Calculate the characteristic polynomial relation for the full mass matrix and
+        the charpoly for the diagonal neutrino mass matrix.
+        
+        This method compares the characteristic polynomials to establish relations
+        between the eigenvalues of the full seesaw mass matrix and the diagonal
+        mass matrix eigenvalues.
+        
+        Returns:
+        --------
+        dict
+            Dictionary with characteristic polynomials and their relations
+        """
+        lamb = sp.symbols('lambda')
+        M = self.full_mass_matrix_symbolic()
+        if substitutions:
+            # Substitute numerical values into the mass matrix
+            M = M.subs(substitutions)
+        
+        I = sp.eye(self.n_neutrinos)
+        
+        #print("Computing characteristic polynomial of full mass matrix...")
+        try:
+            # For large matrices, this can be computationally intensive
+            char_polyM = (M - lamb * I).det().expand()
+            # Collect terms by lambda for better readability
+            if char_polyM != 0:
+                char_polyM = char_polyM.collect(lamb, sp.factor)
+            #print("Characteristic polynomial of M computed successfully")
+        except Exception as e:
+            print(f"Warning: Could not compute characteristic polynomial of M: {e}")
+            char_polyM = sp.S.Zero
+        
+        M_diag = self.M_diag
+        #print("Computing characteristic polynomial of diagonal mass matrix...")
+        char_poly_diag = (M_diag - lamb * I).det().expand()
+        if char_poly_diag != 0:
+            char_poly_diag = char_poly_diag.collect(lamb, sp.factor)
+        
+        # Extract coefficients for comparison
+        coefficients_M = {}
+        coefficients_diag = {}
+        
+        try:
+            for i in range(self.n_neutrinos + 1):
+                #power = lamb**i
+                coeff_M = char_polyM.coeff(lamb, i) if char_polyM != 0 else sp.S.Zero
+                coeff_diag = char_poly_diag.coeff(lamb, i)
+                
+                coefficients_M[f'lambda^{i}'] = coeff_M
+                coefficients_diag[f'lambda^{i}'] = coeff_diag
+        except Exception as e:
+            print(f"Warning: Could not extract coefficients: {e}")
+        
+        return {
+            'char_poly_M': char_polyM,
+            'char_poly_diag': char_poly_diag,
+            'coefficients_full_matrix': coefficients_M,
+            'coefficients_diagonal': coefficients_diag
+        }
+
+    def right_eigenvectors(self, substitutions: dict = None) -> sp.Matrix:
+        """Calculate the right eigenvectors of the full mass matrix.
+        This method solves the eigenvalue equation ( M^† * M) * V = lambda**2 * V,
+        where M is full mass matrix (complex an symmetric in general), and V are 
+        the eigenvectors.
+        Returns:
+        --------
+        sp.Matrix
+            The right eigenvectors of the full mass matrix
+        """
+        v = sp.symbols('v1:{}'.format(self.n_neutrinos + 1))
+        #lamb = sp.symbols('lambda1:{}'.format(self.n_neutrinos + 1), real=True)
+        lamb = self.masses
+        V = sp.Matrix(v)  # Create column vector from list of symbols
+        MDaggerM = self.MDaggerM()
+
+        if substitutions:
+            # Substitute numerical values into the mass matrix
+            MDaggerM = MDaggerM.subs(substitutions)
+
+        eigenvects = []
+        for i in range(self.n_neutrinos):
+            eq = MDaggerM*V - lamb[i]**2 * V
+            #print('Solving for eigenvalue {}...'.format(lamb[i]))
+            #print('Equation:', eq)
+            vj_solutions = []
+            V_current = V.copy()
+            
+            # Solve for the first n-1 components in terms of the last component
+            for j in range(self.n_neutrinos - 1):
+                #print('Solving for component v[{}]...'.format(j+1))  # j+1 because v1, v2, ... indexing
+                try:
+                    vj_sol = sp.solve(eq[j, 0], v[j], dict=True)
+                    if vj_sol:  # Check if solution exists
+                        vj_sol = vj_sol[0]
+                        eq = eq.subs(v[j], vj_sol[v[j]]).applyfunc(lambda x: x.factor())
+                        V_current = V_current.subs(v[j], vj_sol[v[j]])
+                        vj_solutions.append(vj_sol)
+                    else:
+                        print('No solution found for component v[{}]'.format(j+1))
+                except Exception as e:
+                    print('Error solving for component v[{}]: {}'.format(j+1, e))
+            
+            # Set the last component to 1 for normalization
+            V_current = V_current.subs(v[self.n_neutrinos - 1], 1)
+            
+            # Normalize the eigenvector
+            try:
+                norm_squared = (sp.physics.quantum.Dagger(V_current) * V_current)[0]
+                if norm_squared != 0:
+                    V_current = V_current / sp.sqrt(norm_squared)
+                eigenvects.append(V_current)
+            except Exception as e:
+                print('Error normalizing eigenvector {}: {}'.format(i+1, e))
+                eigenvects.append(V_current)  # Add unnormalized if normalization fails
+
+        if eigenvects:
+            # Create matrix with eigenvectors as columns
+            eigenvects_matrix = sp.Matrix.hstack(*eigenvects)
+            return eigenvects_matrix
+        else:
+            return sp.Matrix.zeros(self.n_neutrinos, self.n_neutrinos)
+        
+    def left_eigenvectors(self, substitutions: dict = None) -> sp.Matrix:
+        """Calculate the left eigenvectors of the full mass matrix.
+        This method solves the eigenvalue equation ( M^* * M^T) * V = lambda**2 * V,
+        where M is full mass matrix (complex an symmetric in general), and V are 
+        the eigenvectors.
+        Returns:
+        --------
+        sp.Matrix
+            The left eigenvectors of the full mass matrix
+        """
+        v = sp.symbols('v1:{}'.format(self.n_neutrinos + 1))
+        lamb = self.masses
+        V = sp.Matrix(v)  # Create column vector from list of symbols
+        MConjugateMT = self.MConjugateMT()
+
+        if substitutions:
+            # Substitute numerical values into the mass matrix
+            MConjugateMT = MConjugateMT.subs(substitutions)
+
+        eigenvects = []
+        for i in range(self.n_neutrinos):
+            eq = MConjugateMT*V - lamb[i]**2 * V
+            vj_solutions = []
+            V_current = V.copy()
+            for j in range(self.n_neutrinos - 1):
+                try:
+                    vj_sol = sp.solve(eq[j, 0], v[j], dict=True)
+                    if vj_sol:  # Check if solution exists
+                        vj_sol = vj_sol[0]
+                        eq = eq.subs(v[j], vj_sol[v[j]]).applyfunc(lambda x: x.factor())
+                        V_current = V_current.subs(v[j], vj_sol[v[j]])
+                        vj_solutions.append(vj_sol)
+                    else:
+                        print('No solution found for component v[{}]'.format(j+1))
+                except Exception as e:
+                    print('Error solving for component v[{}]: {}'.format(j+1, e))
+            
+            # 
+            V_current = V_current.subs(v[self.n_neutrinos - 1], 1)
+            
+            # Normalice the eigenvectors
+            try:
+                norm_squared = (sp.physics.quantum.Dagger(V_current) * V_current)[0]
+                if norm_squared != 0:
+                    V_current = V_current / sp.sqrt(norm_squared)
+                    eigenvects.append(V_current)
+            except Exception as e:
+                print('Error normalizing eigenvector {}: {}'.format(i+1, e))
+
+        if eigenvects:
+            # Create matrix with eigenvectors as columns
+            eigenvects_matrix = sp.Matrix.hstack(*eigenvects)
+            return eigenvects_matrix
+        else:
+            return sp.Matrix.zeros(self.n_neutrinos, self.n_neutrinos)
+
+
     def scaling_analysis(self) -> Dict[str, sp.Expr]:
         """
         Perform dimensional analysis of Seesaw scaling.
@@ -148,7 +429,7 @@ class SymbolicSeesawTypeI:
         m_nu_2x2 = m_nu_2x2.simplify()
         
         # Extract eigenvalues symbolically
-        eigenvals = list(m_nu_2x2.eigenvals().keys())
+        eigenvals = list(m_nu_2x2.eigenvals())
         
         return {
             'mass_matrix': m_nu_2x2,
