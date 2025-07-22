@@ -1,8 +1,128 @@
 """
-Visualization utilities for neutrino mass matrices and mixing patterns.
+Visualization Tools for Neutrino Physics Analysis
 
-This module provides plotting functions for visualizing mass spectra,
-mixing matrices, and comparison between different Seesaw mechanisms.
+This module provides specialized plotting and visualization functions designed
+for neutrino mass matrix analysis, mixing pattern studies, and comparison
+between different Seesaw mechanisms. The visualizations are tailored to help
+physicists understand the complex relationships between theoretical predictions
+and experimental observations in neutrino physics.
+
+## Physics-Focused Visualization Features
+
+### Mass Spectrum Analysis:
+- **Logarithmic scales**: Essential for neutrino masses spanning many orders
+- **Mass ordering**: Clear distinction between normal and inverted hierarchies  
+- **Experimental bands**: Comparison with measured mass-squared differences
+- **Hierarchy visualization**: Ratios and relative scale differences
+
+### Mixing Matrix Representations:
+- **Magnitude heatmaps**: |Uₐᵢ|² showing transition probabilities
+- **Phase plots**: Complex phase structure of mixing matrix elements
+- **Unitarity checks**: Visual verification of matrix unitarity
+- **Symmetry patterns**: Recognition of special mixing structures
+
+### Parameter Space Studies:
+- **Multi-dimensional scans**: Exploration of allowed parameter regions
+- **Correlation plots**: Dependencies between mixing angles and masses
+- **Constraint visualization**: Experimental limits and theoretical predictions
+- **Sensitivity analysis**: Parameter variations and uncertainties
+
+### Mechanism Comparisons:
+- **Side-by-side spectra**: Direct comparison between Seesaw types
+- **Phenomenological differences**: Observable consequences of different models
+- **Scale relationships**: Connection between input parameters and predictions
+
+## Physical Context and Conventions
+
+### Energy Scale Representation:
+All plots use physically meaningful scales and units:
+- **Neutrino masses**: eV (typical range: 10⁻³ to 10⁻¹ eV)
+- **Seesaw scales**: GeV to 10¹⁶ GeV (electroweak to GUT scale)
+- **Mass ratios**: Dimensionless hierarchies and fine-tuning measures
+
+### Experimental Reference Data:
+Built-in comparison with current experimental measurements:
+- **NuFIT global fits**: Latest neutrino oscillation parameters
+- **Mass squared differences**: Solar (Δm²₂₁) and atmospheric (Δm²₃₁) scales
+- **Mixing angles**: Reactor, solar, and atmospheric angle measurements
+- **CP violation**: Current constraints on Dirac phase δ_CP
+
+### Color Schemes and Conventions:
+- **Physics-motivated coloring**: Different colors for different mass states
+- **Accessibility**: Colorblind-friendly palettes where possible
+- **Standard conventions**: Following common neutrino physics notation
+
+## Specialized Plot Types
+
+### Mass Spectrum Plots:
+```python
+plot_mass_spectrum(masses, mechanism_name="Type I Seesaw", ordering="normal")
+```
+- Displays mass eigenvalues with proper scaling
+- Shows mass hierarchy and absolute scale
+- Compares with experimental constraints
+- Includes uncertainty bands when available
+
+### Mixing Matrix Heatmaps:
+```python
+plot_mixing_matrix(mixing_matrix, mechanism_name="PMNS")
+```
+- Magnitude and phase representation
+- Clear labeling of flavor (e, μ, τ) and mass (1, 2, 3) bases
+- Unitarity verification and sum rules
+- Color-coded probability amplitudes
+
+### Unitarity Triangles:
+```python
+plot_unitarity_triangle(pmns_matrix)
+```
+- Complex plane visualization of unitarity relations
+- Different triangles from different unitarity conditions
+- Area proportional to CP violation (Jarlskog invariant)
+- Experimental constraints and theoretical predictions
+
+### Parameter Space Scans:
+```python
+plot_parameter_space_scan(param_range, masses_array, "Heavy Mass Scale")
+```
+- Multi-parameter correlation studies
+- Allowed vs excluded regions
+- Sensitivity to experimental uncertainties
+- Model discrimination power
+
+### Comparison Studies:
+```python
+compare_mass_spectra(comparison_results)
+plot_mass_squared_differences(comparison_results)
+```
+- Side-by-side mechanism comparison
+- Quantitative difference measures
+- Experimental preference assessment
+- Model selection criteria
+
+## Technical Features
+
+### Output Formats:
+- **High-resolution PNG**: Publication-quality figures
+- **Vector formats**: Scalable PDF and SVG for presentations
+- **Interactive plots**: Web-based visualization with Plotly integration
+- **Batch processing**: Automated figure generation for parameter studies
+
+### Customization Options:
+- **Flexible styling**: Custom color schemes, fonts, and layouts
+- **Annotation tools**: Physics labels, equations, and explanatory text
+- **Multi-panel figures**: Complex comparison and correlation plots
+- **Export control**: Resolution, format, and size optimization
+
+### Numerical Robustness:
+- **Logarithmic handling**: Proper treatment of zero and negative values
+- **Dynamic scaling**: Automatic range adjustment for different scenarios
+- **Error handling**: Graceful degradation for problematic data
+- **Memory efficiency**: Optimized for large parameter scan datasets
+
+All visualization functions are designed to work seamlessly with the
+computational modules in this package, providing an integrated workflow
+from theoretical calculation to publication-ready figures.
 """
 
 import numpy as np
@@ -23,18 +143,95 @@ def plot_mass_spectrum(masses: np.ndarray,
                         ordering: str = "normal",
                         save_path: Optional[str] = None) -> None:
     """
-    Plot neutrino mass spectrum.
+    Create a comprehensive visualization of the neutrino mass spectrum.
+    
+    This function produces a publication-quality plot showing neutrino mass
+    eigenvalues with proper physics context, experimental comparisons, and
+    clear indication of mass hierarchy patterns.
+    
+    ## Physics Context:
+    
+    **Mass Hierarchies:**
+    - Normal ordering (NO): m₁ < m₂ < m₃ (currently favored)
+    - Inverted ordering (IO): m₃ < m₁ < m₂ (disfavored but not excluded)
+    - Quasi-degenerate: m₁ ≈ m₂ ≈ m₃ (allowed for large absolute masses)
+    
+    **Experimental Constraints:**
+    - Lightest mass: < 0.8 eV (Planck + BAO cosmological constraint)
+    - Mass differences: Δm²₂₁ ≈ 7.4×10⁻⁵ eV², |Δm²₃₁| ≈ 2.5×10⁻³ eV²
+    - Oscillation experiments: Determine ratios, not absolute scale
+    - Direct kinematic limit: < 2 eV (Katrin tritium decay experiment)
+    
+    **Theoretical Predictions:**
+    Different mass generation mechanisms predict different patterns:
+    - Type I Seesaw: Typically hierarchical patterns
+    - Inverse Seesaw: Can accommodate quasi-degenerate spectra
+    - Radiative models: Often predict specific mass ratios
+    
+    ## Visualization Features:
+    
+    **Logarithmic Scale:**
+    Essential for neutrino masses due to:
+    - Wide range: Factor of √(Δm²₃₁/Δm²₂₁) ≈ 6 between scales
+    - Small absolute values: Typically 0.001 - 0.1 eV
+    - Comparison with other fermion masses (electron: 0.511 MeV)
+    
+    **Color Coding:**
+    - Light blue: ν₁ (lightest in normal ordering)
+    - Light green: ν₂ (intermediate mass)
+    - Light coral: ν₃ (heaviest in normal ordering)
+    
+    **Annotations:**
+    - Mass values displayed with appropriate precision
+    - Mass ordering clearly indicated
+    - Mechanism name and theoretical context
+    - Comparison with experimental constraints
     
     Parameters:
     -----------
     masses : np.ndarray
-        Neutrino mass eigenvalues
+        Neutrino mass eigenvalues in eV
+        Should contain 3 elements for standard 3-neutrino case
+        Typical range: 10⁻³ to 10⁻¹ eV
     mechanism_name : str, optional
-        Name of the mechanism for the title
+        Name of the mass generation mechanism for plot title
+        Examples: "Type I Seesaw", "Inverse Seesaw", "Radiative Model"
     ordering : str, optional
-        'normal' or 'inverted' mass ordering
+        Mass ordering convention for labeling
+        - "normal": m₁ < m₂ < m₃ (default)
+        - "inverted": m₃ < m₁ < m₂
     save_path : str, optional
-        Path to save the plot
+        Full path to save the plot file
+        If None, saves to default location with descriptive name
+        
+    Returns:
+    --------
+    None
+        Plot is saved to file and displayed if in interactive mode
+        
+    Notes:
+    ------
+    - Uses logarithmic y-axis to handle small mass values effectively
+    - Automatically sorts masses for consistent display
+    - Includes grid lines for easier value reading
+    - Error bars can be added for masses with uncertainties
+    - Compatible with both theoretical predictions and experimental fits
+    
+    Example:
+    --------
+    >>> import numpy as np
+    >>> # Typical Type I Seesaw prediction
+    >>> masses = np.array([0.001, 0.01, 0.05])  # eV
+    >>> plot_mass_spectrum(masses, "Type I Seesaw", "normal")
+    >>> 
+    >>> # Compare with experimental constraints
+    >>> dm21_sq = 7.4e-5  # eV²
+    >>> dm31_sq = 2.5e-3  # eV²
+    >>> m1 = 0.001  # eV (assumed)
+    >>> m2 = np.sqrt(m1**2 + dm21_sq)
+    >>> m3 = np.sqrt(m1**2 + dm31_sq)
+    >>> experimental_masses = np.array([m1, m2, m3])
+    >>> plot_mass_spectrum(experimental_masses, "Experimental Best Fit", "normal")
     """
     fig, ax = plt.subplots(1, 1, figsize=(8, 6))
     
