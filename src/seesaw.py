@@ -253,6 +253,70 @@ class SymbolicSeesawTypeI:
             'coefficients_full_matrix': coefficients_M,
             'coefficients_diagonal': coefficients_diag
         }
+    
+    def charpoly_relations_MDaggerM(self, substitutions: dict = None) -> Dict[str, sp.Expr]:
+        r"""
+        Calculate the characteristic polynomial relation for the M^\dagger M matrix and
+        the charpoly for \hat{M}^\dagger \hat{M} matrix, where \hat{M} correspond to the diagonal 
+        mass matrix.
+        
+        This method compares the characteristic polynomials to establish relations
+        between the eigenvalues of the full seesaw mass matrix and the diagonal
+        mass matrix eigenvalues.
+        
+        Returns:
+        --------
+        dict
+            Dictionary with characteristic polynomials and their relations
+        """
+        lamb = sp.symbols('lambda')
+        M = self.MDaggerM()
+        if substitutions:
+            # Substitute numerical values into the mass matrix
+            M = M.subs(substitutions)
+        
+        I = sp.eye(self.n_neutrinos)
+        
+        #print("Computing characteristic polynomial of full mass matrix...")
+        try:
+            # For large matrices, this can be computationally intensive
+            char_polyM = (M - lamb * I).det().expand()
+            # Collect terms by lambda for better readability
+            if char_polyM != 0:
+                char_polyM = char_polyM.collect(lamb, sp.factor)
+            #print("Characteristic polynomial of M computed successfully")
+        except Exception as e:
+            print(f"Warning: Could not compute characteristic polynomial of M: {e}")
+            char_polyM = sp.S.Zero
+        
+        M_diag = self.M_diag
+        M_diag = sp.physics.quantum.Dagger(M_diag) * M_diag
+        #print("Computing characteristic polynomial of diagonal mass matrix...")
+        char_poly_diag = (M_diag - lamb * I).det().expand()
+        if char_poly_diag != 0:
+            char_poly_diag = char_poly_diag.collect(lamb, sp.factor)
+        
+        # Extract coefficients for comparison
+        coefficients_M = {}
+        coefficients_diag = {}
+        
+        try:
+            for i in range(self.n_neutrinos + 1):
+                #power = lamb**i
+                coeff_M = char_polyM.coeff(lamb, i) if char_polyM != 0 else sp.S.Zero
+                coeff_diag = char_poly_diag.coeff(lamb, i)
+                
+                coefficients_M[f'lambda^{i}'] = coeff_M
+                coefficients_diag[f'lambda^{i}'] = coeff_diag
+        except Exception as e:
+            print(f"Warning: Could not extract coefficients: {e}")
+        
+        return {
+            'char_poly_M': char_polyM,
+            'char_poly_diag': char_poly_diag,
+            'coefficients_full_matrix': coefficients_M,
+            'coefficients_diagonal': coefficients_diag
+        }
 
     def right_eigenvectors(self, substitutions: dict = None) -> sp.Matrix:
         """Calculate the right eigenvectors of the full mass matrix.
