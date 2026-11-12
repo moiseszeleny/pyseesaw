@@ -106,7 +106,7 @@ def demonstrate_symbolic_inverse_seesaw():
     print("\n=== Symbolic Inverse Seesaw Analysis ===\n")
     
     # Create symbolic Inverse Seesaw model
-    inverse_seesaw = SymbolicInverseSeesaw(n_generations=3, n_sterile=3)
+    inverse_seesaw = SymbolicInverseSeesaw(n_left=3, n_right=3, n_singlet=3)
     
     print("1. Inverse Seesaw Formula")
     print("   The Inverse Seesaw formula is: m_ν = m_D M_R⁻¹ μ (M_Rᵀ)⁻¹ m_Dᵀ")
