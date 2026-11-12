@@ -363,22 +363,15 @@ class SymbolicInverseSeesaw:
             [sp.Symbol('mu_12'), sp.Symbol('mu_22')]  # Symmetric
         ])
         
-        # Calculate light mass matrix using generalized formula
-        try:
-            m_nu_min = inverse_seesaw_symbolic(m_D_min, M_R_min, mu_min)
-            m_nu_min = m_nu_min.simplify()
-            
-            return {
-                'mass_matrix': m_nu_min,
-                'trace': m_nu_min.trace(),
-                'determinant': m_nu_min.det(),
-                'dimensions': f"{n_L_min}+{n_R_min}+{n_S_min} = {n_L_min + n_R_min + n_S_min}×{n_L_min + n_R_min + n_S_min}"
-            }
-        except Exception as e:
-            return {
-                'error': f"Could not compute minimal case: {e}",
-                'dimensions': f"{n_L_min}+{n_R_min}+{n_S_min} = {n_L_min + n_R_min + n_S_min}×{n_L_min + n_R_min + n_S_min}"
-            }
+        # Calculate light mass matrix
+        m_nu_min = inverse_seesaw_symbolic(m_D_min, M_R_min, mu_min)
+        m_nu_min = m_nu_min.applyfunc(sp.simplify)  # Matrix.simplify() works in place and returns None
+        
+        return {
+            'mass_matrix': m_nu_min,
+            'trace': m_nu_min.trace(),
+            'determinant': m_nu_min.det()
+        }
     
     def mu_dependence_analysis(self) -> Dict[str, sp.Expr]:
         """

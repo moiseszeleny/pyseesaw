@@ -36,6 +36,7 @@ src/
 ├── seesaw.py                  # Seesaw mechanisms (Type I, II, III)
 ├── inverse_seesaw.py          # Inverse Seesaw mechanism
 ├── pmns_matrix.py             # PMNS matrix parameterizations
+├── symbolic_diagonalization.py # Exact symbolic (Takagi) diagonalization of the Type I seesaw
 └── visualization.py           # Plotting and analysis tools
 
 examples/
@@ -45,12 +46,48 @@ examples/
 
 notebooks/
 ├── neutrino_mass_exploration.ipynb    # Interactive Jupyter notebook
-├── seesaw_2_active_1_sterile.ipynb    # 2+1 neutrino scenario
-├── seesaw_3_active_1_sterile.ipynb    # 3+1 neutrino scenario  
-└── seesaw_one_generation.ipynb        # Single generation analysis
+├── seesaw_one_generation*.ipynb       # (1,1): real case and complex (Takagi) case
+├── seesaw_N_active_M_sterile.ipynb    # (2,1), (3,1), (1,2), (2,2), (3,2), (1,3), (3,3)
+└── seesaw_feasibility_summary.ipynb   # Where symbolic diagonalization stops being feasible
 
 tests/
-└── test_matrix_utils.py               # Unit tests
+├── test_matrix_utils.py               # Unit tests
+└── test_symbolic_diagonalization.py   # Symbolic results checked numerically
+```
+
+## 🧩 Exact symbolic diagonalization
+
+`src/symbolic_diagonalization.py` and the `seesaw_*` notebooks study the full matrix
+`M = [[0, m_D], [m_D^T, M_R]]` for `n` active and `m` sterile neutrinos, with the convention
+`U^T M U = diag(m_i)`, `m_i >= 0`, first for real and then for complex `m_D`.
+
+- **Counting.** There are `max(n - m, 0)` massless states and `k = m + min(n, m)` massive ones;
+  `n (m - 1)` phases of `m_D` are physical. For `n > m` the problem reduces to `(m, m)`.
+- **Direct** (`direct_diagonalization`): masses and `U` from `m_D`, `M_R`. The masses are roots
+  of a degree-`k` polynomial, so this works only for `k <= 4`: `(n,1)`, `(1,2)`, `(2,2)`,
+  `(3,2)`, `(1,3)`. For `(2,3)` and `(3,3)` no formula in radicals exists.
+- **Semi-explicit** (`semi_explicit_diagonalization`): `U` in terms of the parameters and the
+  masses; works for any `(n, m)`.
+- **Inverse** (`exact_seesaw_parametrization`, `arrowhead_inverse_parameters`): `m_D`, `M_R`
+  and `U` from the masses and an orthogonal matrix, exact to all orders in `m_D / M_R`.
+  It needs only the square root of a `min(n, m)`-dimensional matrix, so it works up to
+  `(3,3)`, where the direct problem has no solution.
+- **Expansion** (`seesaw_block_expansion`): block diagonalization to any order.
+- `verify_takagi` checks any symbolic result at random numerical points (switching to
+  50-digit arithmetic when doubles are not enough), and `feasibility_probe` runs one case
+  with a time limit.
+- **Large results.** The quartic closed forms have up to ~10^8 nodes written out but only
+  ~10^3 distinct subexpressions. `expression_size` reports both numbers and
+  `lambdify_large` evaluates such results quickly; `sp.count_ops`, `.free_symbols`,
+  `sp.cse` and plain `sp.lambdify` walk the written-out tree and do not finish.
+
+```python
+from src.seesaw import SymbolicSeesawTypeI
+from src.symbolic_diagonalization import direct_diagonalization, verify_takagi
+
+model = SymbolicSeesawTypeI(1, 2, dirac='real', majorana_basis='diagonal')
+result = direct_diagonalization(model)            # cubic, trigonometric roots
+verify_takagi(result['U'], model.full_mass_matrix_symbolic(), result['masses'])
 ```
 
 > **Note**: The package is currently in development. Examples use direct `src.` imports with path modifications. Future versions will support standard `import pyseesaw` package imports.
@@ -242,8 +279,8 @@ python tests/test_matrix_utils.py
 
 Or install pytest for more comprehensive testing:
 ```bash
-pip install pytest
-python -m pytest tests/ -v
+python tests/test_matrix_utils.py
+python -m unittest tests.test_symbolic_diagonalization
 ```
 
 ## 🤝 Contributing
