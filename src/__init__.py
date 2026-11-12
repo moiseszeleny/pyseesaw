@@ -13,7 +13,7 @@ Modules:
 - visualization: Plotting and visualization utilities for mass spectra and mixing
 """
 
-__version__ = "1.0.0"
+__version__ = "0.1.0"
 __author__ = "Neutrino Physics Research"
 
 from .matrix_utils import *

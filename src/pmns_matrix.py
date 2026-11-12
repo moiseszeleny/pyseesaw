@@ -1,9 +1,131 @@
 """
-PMNS (Pontecorvo-Maki-Nakagawa-Sakata) mixing matrix implementations.
+PMNS Matrix (Pontecorvo-Maki-Nakagawa-Sakata) Implementation and Analysis
 
-This module provides various parameterizations of the PMNS matrix
-and utilities for extracting mixing angles and CP-violating phases
-from neutrino mass matrices.
+This module provides comprehensive tools for working with the PMNS mixing matrix,
+which describes how neutrino flavor states relate to mass states. The PMNS matrix
+is central to understanding neutrino oscillations and connecting theoretical
+mass generation mechanisms to experimental observations.
+
+## Physics Background
+
+### Neutrino Mixing Concept:
+Neutrinos are produced and detected in flavor eigenstates (νₑ, νμ, ντ) but
+propagate as mass eigenstates (ν₁, ν₂, ν₃). The PMNS matrix U connects these:
+
+|νₐ⟩ = Σᵢ Uₐᵢ |νᵢ⟩    (flavor = U × mass)
+
+### Physical Significance:
+- **Neutrino Oscillations**: Driven by mass differences and mixing angles
+- **CP Violation**: Encoded in complex phases of U
+- **Unitarity**: Ensures probability conservation in oscillations
+
+## PMNS Matrix Parameterization
+
+### Standard Parameterization:
+```
+U = R₂₃(θ₂₃) · Uδ(δ) · R₁₃(θ₁₃) · Uδ†(δ) · R₁₂(θ₁₂) · P(α₁,α₂)
+```
+
+Where:
+- **R₁₂(θ₁₂)**: Solar angle rotation (~33°, large mixing)
+- **R₁₃(θ₁₃)**: Reactor angle rotation (~8.6°, small but crucial)  
+- **R₂₃(θ₂₃)**: Atmospheric angle rotation (~49°, near-maximal)
+- **δ**: Dirac CP-violating phase (~197°, currently being measured)
+- **α₁, α₂**: Majorana phases (unobservable in oscillations)
+
+### PDG Convention (commonly used):
+```
+U = | c₁₂c₁₃                    s₁₂c₁₃                   s₁₃e^(-iδ)        |
+    | -s₁₂c₂₃-c₁₂s₂₃s₁₃e^(iδ)   c₁₂c₂₃-s₁₂s₂₃s₁₃e^(iδ)   s₂₃c₁₃         |
+    | s₁₂s₂₃-c₁₂c₂₃s₁₃e^(iδ)    -c₁₂s₂₃-s₁₂c₂₃s₁₃e^(iδ)  c₂₃c₁₃         |
+```
+
+Where cᵢⱼ = cos θᵢⱼ, sᵢⱼ = sin θᵢⱼ.
+
+## Experimental Status (2023 Global Fits)
+
+### Mixing Angles:
+- **θ₁₂ (Solar)**: 33.45° ± 0.77° (well-measured, large)
+- **θ₁₃ (Reactor)**: 8.62° ± 0.12° (precisely measured, non-zero)
+- **θ₂₃ (Atmospheric)**: 49.2° ± 1.3° (near-maximal, some tension)
+
+### Mass Squared Differences:
+- **Δm²₂₁**: (7.42 ± 0.21) × 10⁻⁵ eV² (solar scale)
+- **|Δm²₃₁|**: (2.515 ± 0.028) × 10⁻³ eV² (atmospheric scale)
+
+### CP Violation:
+- **δCP**: 197° ± 24° (normal ordering, hints of maximal violation)
+- **Majorana phases**: Unconstrained by oscillation experiments
+
+### Mass Ordering:
+- **Normal Ordering**: m₁ < m₂ < m₃ (preferred by data, ~3σ)
+- **Inverted Ordering**: m₃ < m₁ < m₂ (disfavored but not excluded)
+
+## Connection to Theory
+
+### Seesaw Mechanism Predictions:
+The structure of the PMNS matrix provides crucial tests of mass generation mechanisms:
+- **Texture zeros**: Specific vanishing elements from flavor symmetries
+- **Sum rules**: Relations between angles from underlying symmetries  
+- **CP phases**: Predictions from complex mass matrix elements
+- **Correlations**: Links between mixing and mass ratios
+
+### Flavor Models:
+- **Tri-bimaximal mixing**: θ₁₂ = sin⁻¹(1/√3), θ₂₃ = 45°, θ₁₃ = 0°
+- **Bimaximal mixing**: θ₁₂ = θ₂₃ = 45°, θ₁₃ = 0°
+- **Democratic matrix**: Equal off-diagonal elements
+- **Anarchic models**: Random matrix elements
+
+### Grand Unification:
+- **Quark-lepton unification**: Relations between CKM and PMNS matrices
+- **SU(5) predictions**: Specific patterns from GUT breaking
+- **SO(10) models**: Connections to right-handed neutrino sector
+
+## Physical Observables
+
+### Neutrino Oscillation Probabilities:
+P(νₐ → νβ) depends on:
+- Mixing matrix elements |Uₐᵢ|²
+- Mass squared differences Δm²ᵢⱼ  
+- Neutrino energy E and baseline L
+- Matter effects (MSW effect in dense media)
+
+### CP Violation Measures:
+- **Jarlskog invariant**: J = Im(Ue1 Uμ2 U*e2 U*μ1)
+- **Unitarity triangles**: Complex plane representations
+- **T-violation asymmetries**: Direct CP tests in oscillations
+
+### Neutrinoless Double Beta Decay:
+The effective mass depends on PMNS elements and absolute masses:
+|⟨mββ⟩| = |Σᵢ U²eᵢ mᵢ|
+
+## Computational Features
+
+### Matrix Construction:
+- Standard and PDG parameterizations
+- Arbitrary precision with SymPy
+- Efficient numerical evaluation with NumPy
+
+### Parameter Extraction:
+- Robust angle extraction from arbitrary unitary matrices
+- Phase extraction with proper conventions
+- Error propagation and uncertainty analysis
+
+### Phenomenological Tools:
+- Oscillation probability calculations
+- Matter effect implementation (MSW)
+- Unitarity triangle construction
+- Experimental data comparison
+
+### Model Testing:
+- Texture zero analysis
+- Sum rule verification
+- Symmetry pattern recognition
+- Statistical comparison with data
+
+All implementations follow standard physics conventions and provide
+extensive validation against experimental measurements and theoretical
+consistency checks.
 """
 
 import numpy as np
@@ -15,25 +137,81 @@ def pmns_matrix_standard(theta12: float, theta13: float, theta23: float,
                         delta_cp: float = 0.0, 
                         alpha1: float = 0.0, alpha2: float = 0.0) -> np.ndarray:
     """
-    Construct PMNS matrix in standard parameterization.
+    Construct PMNS matrix using the standard physics parameterization.
     
-    U = R23(θ23) · Uδ(δCP) · R13(θ13) · Uδ†(δCP) · R12(θ12) · P(α1,α2)
+    This function implements the complete PMNS matrix including both Dirac
+    and Majorana CP-violating phases, following the standard convention
+    used in most theoretical neutrino physics literature.
     
-    where P(α1,α2) = diag(1, e^(iα1), e^(iα2)) contains Majorana phases.
+    ## Mathematical Structure:
+    U = R₂₃(θ₂₃) · Uδ(δCP) · R₁₃(θ₁₃) · Uδ†(δCP) · R₁₂(θ₁₂) · P(α₁,α₂)
+    
+    Where:
+    - Rᵢⱼ(θ): Rotation matrices in the ij-plane
+    - Uδ(δ): CP phase matrix with δ in the (1,3) position  
+    - P(α₁,α₂): Majorana phase matrix = diag(1, e^(iα₁), e^(iα₂))
+    
+    ## Physical Interpretation:
+    
+    **Mixing Angles:**
+    - θ₁₂: Solar angle, controls ν₁-ν₂ mixing (~33°, large)
+    - θ₁₃: Reactor angle, controls ν₁-ν₃ mixing (~8.6°, small but crucial)
+    - θ₂₃: Atmospheric angle, controls ν₂-ν₃ mixing (~49°, near-maximal)
+    
+    **CP Violation:**
+    - δ_CP: Dirac phase, observable in neutrino oscillations
+      * δ_CP = 0°, 180°: CP conservation
+      * δ_CP = 90°, 270°: Maximal CP violation
+      * Current measurement: ~197° (hints of near-maximal violation)
+    
+    **Majorana Phases:**
+    - α₁, α₂: Observable only in lepton number violating processes
+    - Affect neutrinoless double beta decay rate
+    - Cannot be measured in neutrino oscillation experiments
+    
+    ## Experimental Context:
+    Current global fit values (NuFIT 5.2, 2023):
+    - θ₁₂ = 33.45° ± 0.77°
+    - θ₁₃ = 8.62° ± 0.12°  
+    - θ₂₃ = 49.2° ± 1.3°
+    - δ_CP = 197° ± 24° (normal ordering)
     
     Parameters:
     -----------
     theta12, theta13, theta23 : float
         Mixing angles in radians
+        Valid range: [0, π/2] for physical mixing
     delta_cp : float, optional
         Dirac CP-violating phase in radians (default: 0)
+        Valid range: [0, 2π] with physics defined modulo 2π
     alpha1, alpha2 : float, optional
         Majorana CP-violating phases in radians (default: 0)
+        Valid range: [0, 2π] each
     
     Returns:
     --------
     np.ndarray
-        3×3 PMNS matrix
+        3×3 complex PMNS matrix
+        Rows: flavor states (e, μ, τ)
+        Columns: mass states (1, 2, 3)
+        
+    Notes:
+    ------
+    - Matrix automatically satisfies unitarity: U U† = I
+    - Determinant has unit magnitude: |det(U)| = 1
+    - For Majorana neutrinos, use full parameterization with α₁, α₂
+    - For Dirac neutrinos, set α₁ = α₂ = 0 (phases unphysical)
+    
+    Example:
+    --------
+    >>> import numpy as np
+    >>> # Current best-fit values
+    >>> theta12 = np.radians(33.45)  
+    >>> theta13 = np.radians(8.62)
+    >>> theta23 = np.radians(49.2)
+    >>> delta_cp = np.radians(197)
+    >>> U = pmns_matrix_standard(theta12, theta13, theta23, delta_cp)
+    >>> print(f"Matrix unitarity: {np.allclose(U @ U.conj().T, np.eye(3))}")
     """
     c12, s12 = np.cos(theta12), np.sin(theta12)
     c13, s13 = np.cos(theta13), np.sin(theta13)

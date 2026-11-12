@@ -1,10 +1,48 @@
 """
-Matrix utilities for neutrino mass matrix calculations.
+Matrix Utilities for Neutrino Physics Calculations
 
-This module provides general-purpose matrix operations commonly used
-in neutrino physics, including diagonalization, eigenvalue analysis,
-and numerical stability checks. Uses SymPy for symbolic calculations
-and NumPy for numerical evaluation.
+This module provides specialized matrix operations essential for neutrino mass matrix
+analysis, with emphasis on the unique challenges in neutrino physics such as handling
+complex symmetric matrices, maintaining unitarity, and dealing with widely separated
+mass scales.
+
+## Physics Context
+
+In neutrino physics, we frequently encounter several types of matrices:
+
+### Mass Matrices:
+- **Majorana mass matrix**: Complex symmetric, M = M^T
+- **Dirac mass matrix**: General complex matrix connecting different chiralities
+- **Light neutrino mass matrix**: Effective matrix from Seesaw mechanisms
+
+### Mixing Matrices:
+- **PMNS matrix**: Unitary 3×3 matrix relating flavor and mass eigenstates
+- **General mixing matrices**: From diagonalization of mass matrices
+
+### Key Physics Requirements:
+1. **Hermiticity**: Physical observables require Hermitian matrices
+2. **Unitarity**: Probability conservation demands unitary mixing matrices
+3. **Mass ordering**: Physical convention requires ordered mass eigenvalues
+4. **Numerical stability**: Wide mass hierarchies (10⁻³ to 10¹⁶ eV) require careful numerics
+
+## Mathematical Conventions
+
+### Diagonalization:
+For Majorana neutrinos: M = U* diag(m₁, m₂, m₃) U†
+Where U is the PMNS matrix and mᵢ are real positive masses.
+
+### Phase Conventions:
+- Mass eigenvalues are taken positive by convention
+- Complex phases absorbed into mixing matrix elements
+- Majorana phases appear as additional diagonal matrix factors
+
+### Units and Scales:
+- All masses in eV
+- Mixing angles in radians unless specified
+- Energy scales span from 10⁻³ eV (neutrino masses) to 10¹⁶ GeV (GUT scale)
+
+Uses SymPy for exact symbolic manipulations and NumPy/SciPy for numerical evaluation
+with optimized algorithms for the specific challenges of neutrino physics.
 """
 
 import numpy as np
@@ -139,24 +177,57 @@ def diagonalize_hermitian_matrix(matrix: np.ndarray,
 def diagonalize_mass_matrix(mass_matrix: np.ndarray, 
                            symmetric: bool = True) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Diagonalize a neutrino mass matrix.
+    Diagonalize a neutrino mass matrix using physics-appropriate conventions.
     
-    For Majorana neutrinos, the mass matrix is symmetric.
-    For Dirac neutrinos, we typically work with M†M.
+    This function handles the specific requirements of neutrino physics:
+    - Majorana neutrinos have symmetric mass matrices
+    - Mass eigenvalues must be positive (by convention)
+    - Mixing matrices must be unitary
+    - Proper treatment of negative eigenvalues with phase adjustments
+    
+    Physics Background:
+    For Majorana neutrinos, the mass term in the Lagrangian is:
+    ℒ_mass = -½ (ν̄_L)ᶜ M_ν ν_L + h.c.
+    
+    where M_ν is a complex symmetric matrix. Diagonalization gives:
+    M_ν = U* diag(m₁, m₂, m₃) U†
+    
+    with positive masses mᵢ and unitary matrix U (PMNS matrix).
     
     Parameters:
     -----------
     mass_matrix : np.ndarray
-        The mass matrix to diagonalize
+        The neutrino mass matrix to diagonalize
+        - For Majorana: symmetric complex matrix
+        - For Dirac: we typically work with M†M
     symmetric : bool, optional
-        Whether to treat as symmetric (Majorana) or general complex matrix
+        Whether to treat as symmetric (Majorana case, default: True)
+        - True: Use eigendecomposition for symmetric matrices
+        - False: Use SVD for general complex matrices
     
     Returns:
     --------
     masses : np.ndarray
-        Mass eigenvalues (positive real values)
+        Mass eigenvalues (positive real values, ordered)
+        Units: eV (typical range 10⁻³ to 10⁻¹ eV for light neutrinos)
     mixing_matrix : np.ndarray
-        Unitary mixing matrix
+        Unitary mixing matrix (PMNS-like)
+        Columns are mass eigenstates, rows are flavor eigenstates
+        
+    Notes:
+    ------
+    - Negative eigenvalues are handled by taking absolute values and adjusting
+      the corresponding eigenvector phases (multiply by i)
+    - This preserves the physics while maintaining positive mass convention
+    - For Dirac neutrinos, use symmetric=False and input M†M matrix
+    
+    Example:
+    --------
+    >>> # Light neutrino mass matrix from Type I Seesaw
+    >>> m_nu = np.array([[1e-3, 1e-4], [1e-4, 2e-3]])  # eV
+    >>> masses, U = diagonalize_mass_matrix(m_nu)
+    >>> print(f"Masses: {masses} eV")
+    >>> print(f"Mixing matrix unitarity check: {np.allclose(U @ U.conj().T, np.eye(2))}")
     """
     if symmetric:
         # For symmetric mass matrix (Majorana case)
@@ -364,24 +435,59 @@ def create_symbolic_matrix(name: str, shape: Tuple[int, int],
 def seesaw_approximation_symbolic(m_D: sp.Matrix, M_R: sp.Matrix, 
                                  order: int = 1) -> sp.Matrix:
     """
-    Calculate symbolic Seesaw approximation to different orders.
+    Calculate symbolic Type I Seesaw approximation to different orders in perturbation theory.
     
-    The Type I Seesaw formula: m_ν = -m_D M_R^(-1) m_D^T
-    can be expanded in powers of m_D/M_R.
+    Physics Background:
+    The Type I Seesaw mechanism introduces heavy right-handed neutrinos with masses M_R
+    and Dirac couplings m_D to left-handed neutrinos. After integrating out the heavy
+    states, the effective light neutrino mass matrix is:
+    
+    m_ν = -m_D M_R⁻¹ m_D^T  (leading order)
+    
+    This can be expanded in powers of the small parameter ε = m_D/M_R:
+    
+    m_ν = -ε² M_R + O(ε⁴)  (for order-by-order expansion)
+    
+    The negative sign comes from the Majorana nature of the mass term and the
+    particular convention for the Dirac mass term in the Lagrangian.
+    
+    Typical Scales:
+    - m_D ~ O(100 GeV) (electroweak scale, similar to charged fermion masses)
+    - M_R ~ O(10¹⁰⁻¹⁶ GeV) (high scale, possibly near GUT scale)  
+    - m_ν ~ m_D²/M_R ~ O(0.01-0.1 eV) (observed neutrino mass scale)
     
     Parameters:
     -----------
     m_D : sp.Matrix
-        Symbolic Dirac mass matrix
-    M_R : sp.Matrix
-        Symbolic Majorana mass matrix
+        Symbolic Dirac mass matrix (n_generations × n_sterile)
+        Represents Yukawa couplings × Higgs VEV
+        Typical entries: O(10⁻⁶ - 1) in units where v_EW = 246 GeV
+    M_R : sp.Matrix  
+        Symbolic right-handed Majorana mass matrix (n_sterile × n_sterile)
+        Must be symmetric and invertible
+        Typical entries: O(10¹⁰⁻¹⁶ GeV) for natural small neutrino masses
     order : int, optional
-        Order of approximation (1 = leading order, 2 = next-to-leading, etc.)
+        Order of approximation in powers of (m_D/M_R)
+        - 1: Leading order Seesaw (default)
+        - 2: Next-to-leading order (includes higher-order corrections)
     
     Returns:
     --------
     sp.Matrix
-        Symbolic light neutrino mass matrix
+        Symbolic light neutrino mass matrix in the flavor basis
+        Entries typically O(0.01-0.1 eV) for realistic parameters
+        
+    Notes:
+    ------
+    - The formula assumes M_R >> m_D (heavy mass hierarchy)
+    - Higher orders involve more complex expressions with multiple matrix inversions
+    - For numerical evaluation, use substitute_numerical_values() afterward
+    - Result should be diagonalized to get physical masses and mixing angles
+    
+    Mathematical Details:
+    The expansion parameter is dimensionless: ε ~ m_D/M_R ~ 10⁻¹²
+    This extreme smallness naturally explains the tiny neutrino masses
+    without additional fine-tuning.
     """
     if order == 1:
         # Leading order Seesaw
