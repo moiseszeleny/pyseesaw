@@ -9,7 +9,7 @@ Modules:
 - seesaw: Implementation of various Seesaw mechanisms (Type I, II, III)
 - inverse_seesaw: Implementation of Inverse Seesaw mechanism
 - pmns_matrix: PMNS mixing matrix parameterizations and calculations
-- mass_ordering: Tools for analyzing normal and inverted mass hierarchies
+- symbolic_diagonalization: Exact symbolic (Takagi) diagonalization of the Type I seesaw matrix
 - visualization: Plotting and visualization utilities for mass spectra and mixing
 """
 
@@ -20,3 +20,4 @@ from .matrix_utils import *
 from .seesaw import *
 from .inverse_seesaw import *
 from .pmns_matrix import *
+from .symbolic_diagonalization import *

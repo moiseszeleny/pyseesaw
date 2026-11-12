@@ -186,7 +186,7 @@ class SymbolicInverseSeesaw:
         
         # Calculate light mass matrix
         m_nu_min = inverse_seesaw_symbolic(m_D_min, M_R_min, mu_min)
-        m_nu_min = m_nu_min.simplify()
+        m_nu_min = m_nu_min.applyfunc(sp.simplify)  # Matrix.simplify() works in place and returns None
         
         return {
             'mass_matrix': m_nu_min,

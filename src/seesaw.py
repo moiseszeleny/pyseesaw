@@ -12,7 +12,7 @@ import sympy as sp
 from typing import Tuple, Optional, Union, Dict
 from .matrix_utils import (diagonalize_mass_matrix, mass_squared_differences,
                           create_symbolic_matrix, seesaw_approximation_symbolic,
-                          substitute_numerical_values)
+                          substitute_numerical_values, mass_difference_dummies)
 
 
 class SymbolicSeesawTypeI:
@@ -24,8 +24,9 @@ class SymbolicSeesawTypeI:
     exploration of different limits and parameter regimes.
     """
     
-    def __init__(self, n_generations: int = 3, n_sterile: int = 3):
-        """
+    def __init__(self, n_generations: int = 3, n_sterile: int = 3, *,
+                 dirac: str = 'generic', majorana_basis: str = 'general'):
+        r"""
         Initialize symbolic Seesaw Type I setup.
         
         Parameters:
@@ -34,15 +35,58 @@ class SymbolicSeesawTypeI:
             Number of active neutrino generations (default: 3)
         n_sterile : int, optional
             Number of sterile neutrinos (default: 3)
+        dirac : {'generic', 'real', 'polar'}, optional
+            Assumptions on the Dirac mass matrix ``m_D``:
+
+            - ``'generic'`` (default): symbols ``m_D_ij`` without assumptions.
+            - ``'real'``: real symbols ``m_D_ij`` (CP-conserving case).
+            - ``'polar'``: ``m_D_ij = r_ij exp(i phi_ij)`` with ``r_ij > 0`` and
+              ``phi_ij`` real. The ``n_generations`` phases of the first column
+              are removed by rephasing the active fields, leaving the
+              ``n_generations (n_sterile - 1)`` physical phases.
+        majorana_basis : {'general', 'diagonal'}, optional
+            ``'general'`` (default): real symmetric ``M_R`` with symbols
+            ``M_R_ij``. ``'diagonal'``: ``M_R = diag(M_1, ..., M_m)`` with
+            ``M_i > 0``, which is no loss of generality (sterile basis change).
         """
+        if dirac not in ('generic', 'real', 'polar'):
+            raise ValueError("dirac must be 'generic', 'real' or 'polar'")
+        if majorana_basis not in ('general', 'diagonal'):
+            raise ValueError("majorana_basis must be 'general' or 'diagonal'")
+
         self.n_gen = n_generations
         self.n_sterile = n_sterile
         self.n_neutrinos = n_generations + n_sterile
+        self.dirac = dirac
+        self.majorana_basis = majorana_basis
+        self.dirac_moduli: Optional[sp.Matrix] = None
+        self.dirac_phases: Optional[sp.Matrix] = None
         
         # Create symbolic matrices
-        self.m_D_sym = create_symbolic_matrix('m_D', (n_generations, n_sterile))
-        self.M_R_sym = create_symbolic_matrix('M_R', (n_sterile, n_sterile), 
-                                            real=True, symmetric=True)
+        if dirac == 'generic':
+            self.m_D_sym = create_symbolic_matrix('m_D', (n_generations, n_sterile))
+        elif dirac == 'real':
+            self.m_D_sym = create_symbolic_matrix('m_D', (n_generations, n_sterile),
+                                                  real=True)
+        else:
+            self.dirac_moduli = sp.Matrix(
+                n_generations, n_sterile,
+                lambda i, j: sp.Symbol(f'r_{i+1}{j+1}', positive=True))
+            self.dirac_phases = sp.Matrix(
+                n_generations, n_sterile,
+                lambda i, j: sp.S.Zero if j == 0
+                else sp.Symbol(f'phi_{i+1}{j+1}', real=True))
+            self.m_D_sym = sp.Matrix(
+                n_generations, n_sterile,
+                lambda i, j: self.dirac_moduli[i, j]
+                * sp.exp(sp.I * self.dirac_phases[i, j]))
+
+        if majorana_basis == 'general':
+            self.M_R_sym = create_symbolic_matrix('M_R', (n_sterile, n_sterile),
+                                                  real=True, symmetric=True)
+        else:
+            self.M_R_sym = sp.diag(*[sp.Symbol(f'M_{i+1}', positive=True)
+                                     for i in range(n_sterile)])
         # Initialize symbolic masses for all neutrinos
         self.masses = sp.symbols(f'm_{{n_1:{n_generations + n_sterile + 1}}}', positive=True)
 
@@ -68,21 +112,27 @@ class SymbolicSeesawTypeI:
     def __repr__(self):
         return f"SymbolicSeesawTypeI(n_generations={self.n_gen}, n_sterile={self.n_sterile})"
 
+    @property
+    def n_massless(self) -> int:
+        """Number of massless states for generic parameters, ``max(n - m, 0)``."""
+        return max(self.n_gen - self.n_sterile, 0)
+
+    @property
+    def n_massive(self) -> int:
+        """Number of massive states for generic parameters, ``m + min(n, m)``."""
+        return self.n_sterile + min(self.n_gen, self.n_sterile)
+
+    @property
+    def massive_masses(self) -> Tuple[sp.Symbol, ...]:
+        """Mass symbols of the massive states (light first, then heavy)."""
+        return tuple(self.masses[self.n_massless:])
+
     def neutrino_mass_differences_dummyes(self):
         """
         Create neutrino mass differences and return them as a dictionary with mass differences
         and their corresponding dummy variable which represents a negative value.
         """
-        mn = self.masses
-        mass_differences = {}
-        for i in range(self.n_neutrinos):
-            for j in range(i + 1, self.n_neutrinos):
-                if i != j and i < j:
-                    diff = mn[i] - mn[j]
-                    dummy_diff = sp.Dummy(f'D_{{{i + 1}{j + 1}}}', negative=True)
-                    mass_differences[diff] = dummy_diff
-        return mass_differences
-                
+        return mass_difference_dummies(self.masses)
 
     def set_texture(self, dirac_texture: Optional[list] = None, 
                    majorana_texture: Optional[list] = None):
@@ -103,6 +153,10 @@ class SymbolicSeesawTypeI:
         if majorana_texture:
             from .matrix_utils import texture_zeros_matrix
             self.M_R_sym = texture_zeros_matrix(self.M_R_sym, majorana_texture)
+
+        # Cached expressions depend on the textures
+        self._light_mass_symbolic = None
+        self._full_mass_matrix_symbolic = None
     
     def light_mass_matrix_symbolic(self, order: int = 1) -> sp.Matrix:
         """
@@ -178,7 +232,7 @@ class SymbolicSeesawTypeI:
             The product M^† * M, where M is the full mass matrix
         """
         M = self.full_mass_matrix_symbolic()
-        return sp.physics.quantum.Dagger(M) * M
+        return M.H * M
     
     def MConjugateMT(self) -> sp.Matrix:
         """
@@ -192,42 +246,26 @@ class SymbolicSeesawTypeI:
         M = self.full_mass_matrix_symbolic()
         return sp.conjugate(M) * M.T
     
-    def charpoly_relations(self, substitutions: dict = None) -> Dict[str, sp.Expr]:
+    def _charpoly_relations(self, M: sp.Matrix, M_diag: sp.Matrix) -> Dict[str, sp.Expr]:
         """
-        Calculate the characteristic polynomial relation for the full mass matrix and
-        the charpoly for the diagonal neutrino mass matrix.
-        
-        This method compares the characteristic polynomials to establish relations
-        between the eigenvalues of the full seesaw mass matrix and the diagonal
-        mass matrix eigenvalues.
-        
-        Returns:
-        --------
-        dict
-            Dictionary with characteristic polynomials and their relations
+        Compare ``det(M - lambda)`` with ``det(M_diag - lambda)`` coefficient by coefficient.
+
+        Shared implementation of :meth:`charpoly_relations` and
+        :meth:`charpoly_relations_MDaggerM`.
         """
         lamb = sp.symbols('lambda')
-        M = self.full_mass_matrix_symbolic()
-        if substitutions:
-            # Substitute numerical values into the mass matrix
-            M = M.subs(substitutions)
-        
         I = sp.eye(self.n_neutrinos)
         
-        #print("Computing characteristic polynomial of full mass matrix...")
         try:
             # For large matrices, this can be computationally intensive
             char_polyM = (M - lamb * I).det().expand()
             # Collect terms by lambda for better readability
             if char_polyM != 0:
                 char_polyM = char_polyM.collect(lamb, sp.factor)
-            #print("Characteristic polynomial of M computed successfully")
         except Exception as e:
             print(f"Warning: Could not compute characteristic polynomial of M: {e}")
             char_polyM = sp.S.Zero
         
-        M_diag = self.M_diag
-        #print("Computing characteristic polynomial of diagonal mass matrix...")
         char_poly_diag = (M_diag - lamb * I).det().expand()
         if char_poly_diag != 0:
             char_poly_diag = char_poly_diag.collect(lamb, sp.factor)
@@ -238,7 +276,6 @@ class SymbolicSeesawTypeI:
         
         try:
             for i in range(self.n_neutrinos + 1):
-                #power = lamb**i
                 coeff_M = char_polyM.coeff(lamb, i) if char_polyM != 0 else sp.S.Zero
                 coeff_diag = char_poly_diag.coeff(lamb, i)
                 
@@ -253,6 +290,25 @@ class SymbolicSeesawTypeI:
             'coefficients_full_matrix': coefficients_M,
             'coefficients_diagonal': coefficients_diag
         }
+
+    def charpoly_relations(self, substitutions: dict = None) -> Dict[str, sp.Expr]:
+        """
+        Calculate the characteristic polynomial relation for the full mass matrix and
+        the charpoly for the diagonal neutrino mass matrix.
+        
+        This method compares the characteristic polynomials to establish relations
+        between the eigenvalues of the full seesaw mass matrix and the diagonal
+        mass matrix eigenvalues.
+        
+        Returns:
+        --------
+        dict
+            Dictionary with characteristic polynomials and their relations
+        """
+        M = self.full_mass_matrix_symbolic()
+        if substitutions:
+            M = M.subs(substitutions)
+        return self._charpoly_relations(M, self.M_diag)
     
     def charpoly_relations_MDaggerM(self, substitutions: dict = None) -> Dict[str, sp.Expr]:
         r"""
@@ -269,54 +325,56 @@ class SymbolicSeesawTypeI:
         dict
             Dictionary with characteristic polynomials and their relations
         """
-        lamb = sp.symbols('lambda')
         M = self.MDaggerM()
         if substitutions:
-            # Substitute numerical values into the mass matrix
             M = M.subs(substitutions)
-        
-        I = sp.eye(self.n_neutrinos)
-        
-        #print("Computing characteristic polynomial of full mass matrix...")
-        try:
-            # For large matrices, this can be computationally intensive
-            char_polyM = (M - lamb * I).det().expand()
-            # Collect terms by lambda for better readability
-            if char_polyM != 0:
-                char_polyM = char_polyM.collect(lamb, sp.factor)
-            #print("Characteristic polynomial of M computed successfully")
-        except Exception as e:
-            print(f"Warning: Could not compute characteristic polynomial of M: {e}")
-            char_polyM = sp.S.Zero
-        
-        M_diag = self.M_diag
-        M_diag = sp.physics.quantum.Dagger(M_diag) * M_diag
-        #print("Computing characteristic polynomial of diagonal mass matrix...")
-        char_poly_diag = (M_diag - lamb * I).det().expand()
-        if char_poly_diag != 0:
-            char_poly_diag = char_poly_diag.collect(lamb, sp.factor)
-        
-        # Extract coefficients for comparison
-        coefficients_M = {}
-        coefficients_diag = {}
-        
-        try:
-            for i in range(self.n_neutrinos + 1):
-                #power = lamb**i
-                coeff_M = char_polyM.coeff(lamb, i) if char_polyM != 0 else sp.S.Zero
-                coeff_diag = char_poly_diag.coeff(lamb, i)
-                
-                coefficients_M[f'lambda^{i}'] = coeff_M
-                coefficients_diag[f'lambda^{i}'] = coeff_diag
-        except Exception as e:
-            print(f"Warning: Could not extract coefficients: {e}")
-        
-        return {
-            'char_poly_M': char_polyM,
-            'char_poly_diag': char_poly_diag,
-            'coefficients_full_matrix': coefficients_M,
-            'coefficients_diagonal': coefficients_diag
-        }
+        M_diag = self.M_diag.H * self.M_diag
+        return self._charpoly_relations(M, M_diag)
+
+    def reduced_charpoly(self, hermitian_square: bool = False,
+                         lamb: Optional[sp.Symbol] = None,
+                         substitutions: Optional[dict] = None) -> sp.Poly:
+        r"""
+        Monic characteristic polynomial with the massless states factored out.
+
+        For ``n > m`` the full matrix has rank ``2m``, so its characteristic
+        polynomial contains a factor ``lambda^(n-m)``. The remaining factor has
+        degree ``k = m + min(n, m)`` (the number of massive states) and decides
+        whether the masses can be written in closed form (``k <= 4``).
+
+        Parameters:
+        -----------
+        hermitian_square : bool, optional
+            If False (default) use ``det(lambda - M)``, whose roots are the
+            signed masses; appropriate when ``M`` is real. If True use
+            ``det(lambda - M^\dagger M)``, whose roots are the squared masses;
+            required when ``M`` is complex.
+        lamb : sp.Symbol, optional
+            Polynomial variable (default: ``lambda``)
+        substitutions : dict, optional
+            Substitutions applied to the mass matrix first
+
+        Returns:
+        --------
+        sp.Poly
+            Monic polynomial of degree ``n_massive`` in ``lamb``
+        """
+        if lamb is None:
+            lamb = sp.symbols('lambda')
+        M = self.MDaggerM() if hermitian_square else self.full_mass_matrix_symbolic()
+        if substitutions:
+            M = M.subs(substitutions)
+
+        coefficients = [sp.expand(c) for c in M.charpoly(lamb).all_coeffs()]
+        n_zero = self.n_massless
+        if n_zero:
+            dropped = coefficients[-n_zero:]
+            if any(sp.simplify(c) != 0 for c in dropped):
+                raise ValueError("Expected massless states are absent; "
+                                 "the characteristic polynomial has no lambda^"
+                                 f"{n_zero} factor")
+            coefficients = coefficients[:-n_zero]
+        return sp.Poly(coefficients, lamb)
 
     def right_eigenvectors(self, substitutions: dict = None) -> sp.Matrix:
         """Calculate the right eigenvectors of the full mass matrix.
@@ -366,7 +424,7 @@ class SymbolicSeesawTypeI:
             
             # Normalize the eigenvector
             try:
-                norm_squared = (sp.physics.quantum.Dagger(V_current) * V_current)[0]
+                norm_squared = (V_current.H * V_current)[0]
                 if norm_squared != 0:
                     V_current = V_current / sp.sqrt(norm_squared)
                 eigenvects.append(V_current)
@@ -423,7 +481,7 @@ class SymbolicSeesawTypeI:
             
             # Normalice the eigenvectors
             try:
-                norm_squared = (sp.physics.quantum.Dagger(V_current) * V_current)[0]
+                norm_squared = (V_current.H * V_current)[0]
                 if norm_squared != 0:
                     V_current = V_current / sp.sqrt(norm_squared)
                     eigenvects.append(V_current)
@@ -490,7 +548,7 @@ class SymbolicSeesawTypeI:
         # Calculate Seesaw mass matrix
         M_R_inv = M_R_2x2.inv()
         m_nu_2x2 = -m_D_2x2 * M_R_inv * m_D_2x2.T
-        m_nu_2x2 = m_nu_2x2.simplify()
+        m_nu_2x2 = m_nu_2x2.applyfunc(sp.simplify)  # Matrix.simplify() works in place and returns None
         
         # Extract eigenvalues symbolically
         eigenvals = list(m_nu_2x2.eigenvals())

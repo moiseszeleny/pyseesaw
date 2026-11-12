@@ -9,8 +9,8 @@ and NumPy for numerical evaluation.
 
 import numpy as np
 import sympy as sp
-from scipy.linalg import eigh, svd
-from typing import Tuple, Optional, Union
+from scipy.linalg import eigh, svd, sqrtm
+from typing import Dict, List, Sequence, Tuple, Optional, Union
 import warnings
 
 def sin_cos_from_tan_fraction(tan_expression: sp.Expr) -> Tuple[sp.Expr, sp.Expr]:
@@ -388,11 +388,8 @@ def seesaw_approximation_symbolic(m_D: sp.Matrix, M_R: sp.Matrix,
         M_R_inv = M_R.inv()
         m_nu = -m_D * M_R_inv * m_D.T
     elif order == 2:
-        # Include next-to-leading corrections
-        # This would include (m_D/M_R)^3 terms in full theory
-        warnings.warn("Higher-order corrections not fully implemented")
-        M_R_inv = M_R.inv()
-        m_nu = -m_D * M_R_inv * m_D.T
+        # Next-to-leading order: terms up to (m_D M_R^-1)^4 M_R
+        m_nu = seesaw_block_expansion(m_D, M_R, order=4)['m_light']
     else:
         raise ValueError("Only orders 1 and 2 are supported")
     
@@ -500,3 +497,263 @@ def texture_zeros_matrix(base_matrix: sp.Matrix, zero_positions: list) -> sp.Mat
         result[i, j] = 0
     
     return result
+
+
+def takagi_factorization(matrix: np.ndarray,
+                         tolerance: float = 1e-10) -> Tuple[np.ndarray, np.ndarray]:
+    r"""
+    Numerical Takagi factorization of a complex symmetric (Majorana) mass matrix.
+
+    Finds a unitary ``U`` and non-negative masses ``m_i`` such that
+
+    .. math:: U^T M U = \mathrm{diag}(m_1, \dots, m_N), \qquad m_i \ge 0 .
+
+    Unlike :func:`diagonalize_mass_matrix` with ``symmetric=True`` (which uses
+    ``eigh`` and is therefore only correct for *real* symmetric matrices),
+    this is valid for any complex symmetric matrix, including degenerate and
+    vanishing masses.
+
+    The construction uses the SVD ``M = W S V^\dagger``. For symmetric ``M``
+    the unitary ``Z = W^\dagger V^*`` commutes with ``S``, and
+    ``U = (W Z^{1/2})^*``.
+
+    Parameters:
+    -----------
+    matrix : np.ndarray
+        Complex symmetric matrix, ``M = M^T``
+    tolerance : float, optional
+        Relative tolerance for the symmetry check and for identifying
+        vanishing singular values
+
+    Returns:
+    --------
+    masses : np.ndarray
+        Non-negative masses in ascending order
+    mixing_matrix : np.ndarray
+        Unitary matrix ``U`` with ``U^T M U = diag(masses)``
+
+    Raises:
+    -------
+    ValueError
+        If the matrix is not square or not symmetric
+    """
+    matrix = np.asarray(matrix, dtype=complex)
+    if matrix.ndim != 2 or matrix.shape[0] != matrix.shape[1]:
+        raise ValueError("Matrix must be square")
+    scale = max(np.max(np.abs(matrix)), 1e-300)
+    if not np.allclose(matrix, matrix.T, rtol=0, atol=tolerance * scale):
+        raise ValueError("Matrix is not symmetric")
+
+    W, singular_values, Vh = svd(matrix)
+    Z = W.conj().T @ Vh.T  # W^dagger V^*
+
+    # Z is only meaningful inside each block of equal singular values; it is
+    # arbitrary on the null space, where any unitary completion works.
+    dim = len(singular_values)
+    Z_block = np.zeros_like(Z)
+    for i in range(dim):
+        for j in range(dim):
+            same_block = abs(singular_values[i] - singular_values[j]) <= tolerance * scale
+            is_null = (singular_values[i] <= tolerance * scale
+                       or singular_values[j] <= tolerance * scale)
+            if is_null:
+                Z_block[i, j] = 1.0 if i == j else 0.0
+            elif same_block:
+                Z_block[i, j] = Z[i, j]
+
+    takagi_vectors = W @ sqrtm(Z_block)  # M = T S T^T
+    mixing_matrix = takagi_vectors.conj()
+
+    order = np.argsort(singular_values)
+    return singular_values[order], mixing_matrix[:, order]
+
+
+def mass_difference_dummies(masses: Sequence[sp.Symbol]) -> Dict[sp.Expr, sp.Dummy]:
+    """
+    Map every ordered mass difference ``m_i - m_j`` (``i < j``) to a negative dummy.
+
+    Encodes the physical assumption ``m_1 < m_2 < ... < m_N`` so that SymPy can
+    simplify square roots such as ``sqrt((m_1 - m_2)**2)``.
+
+    Parameters:
+    -----------
+    masses : sequence of sp.Symbol
+        Mass symbols in ascending order
+
+    Returns:
+    --------
+    dict
+        ``{m_i - m_j: D_ij}`` with ``D_ij`` a negative ``sp.Dummy``
+    """
+    differences = {}
+    for i in range(len(masses)):
+        for j in range(i + 1, len(masses)):
+            differences[masses[i] - masses[j]] = sp.Dummy(
+                f'D_{{{i + 1}{j + 1}}}', negative=True)
+    return differences
+
+
+def simplify_with_mass_ordering(expression: Union[sp.Expr, sp.Matrix],
+                                masses: Sequence[sp.Symbol]) -> Union[sp.Expr, sp.Matrix]:
+    """
+    Simplify an expression assuming the mass ordering ``m_1 < m_2 < ... < m_N``.
+
+    Factors the expression, replaces each difference ``m_i - m_j`` (``i < j``)
+    by a negative dummy, simplifies, substitutes back and factors again.
+
+    Parameters:
+    -----------
+    expression : sp.Expr or sp.Matrix
+        Expression (or matrix, treated element-wise) to simplify
+    masses : sequence of sp.Symbol
+        Mass symbols in ascending order
+
+    Returns:
+    --------
+    sp.Expr or sp.Matrix
+        Simplified expression
+    """
+    differences = mass_difference_dummies(masses)
+    restore = {dummy: diff for diff, dummy in differences.items()}
+
+    def _simplify(expr: sp.Expr) -> sp.Expr:
+        expr = sp.factor(sp.sympify(expr), deep=True)
+        return sp.factor(sp.simplify(expr.subs(differences)).subs(restore))
+
+    if isinstance(expression, sp.MatrixBase):
+        return expression.applyfunc(_simplify)
+    return _simplify(expression)
+
+
+def _truncated_series_product(a: List[sp.Matrix], b: List[sp.Matrix],
+                              max_power: int) -> List[sp.Matrix]:
+    """Product of two matrix power series (lists indexed by power), truncated."""
+    rows, cols = a[0].rows, b[0].cols
+    result = [sp.zeros(rows, cols) for _ in range(max_power + 1)]
+    for i, a_i in enumerate(a):
+        if a_i.is_zero_matrix:
+            continue
+        for j, b_j in enumerate(b):
+            if i + j > max_power:
+                break
+            if b_j.is_zero_matrix:
+                continue
+            result[i + j] += a_i * b_j
+    return result
+
+
+def _binomial_matrix_series(a: List[sp.Matrix], exponent: sp.Rational,
+                            max_power: int) -> List[sp.Matrix]:
+    """Series of ``(1 + A)**exponent`` for a matrix series ``A`` with no constant term."""
+    dim = a[0].rows
+    identity = [sp.eye(dim)] + [sp.zeros(dim, dim) for _ in range(max_power)]
+    result = [m.copy() for m in identity]
+    power = [m.copy() for m in identity]
+    lowest = next((k for k, a_k in enumerate(a) if not a_k.is_zero_matrix), None)
+    if lowest is None:
+        return result
+    n = 1
+    while n * lowest <= max_power:
+        power = _truncated_series_product(power, a, max_power)
+        coefficient = sp.binomial(exponent, n)
+        for k in range(max_power + 1):
+            result[k] += coefficient * power[k]
+        n += 1
+    return result
+
+
+def seesaw_block_expansion(m_D: sp.Matrix, M_R: sp.Matrix,
+                           order: int = 4) -> Dict[str, object]:
+    r"""
+    Block-diagonalize the Type I seesaw matrix order by order in ``m_D M_R^{-1}``.
+
+    For ``M = [[0, m_D], [m_D^T, M_R]]`` the light subspace is spanned by the
+    columns of ``[1; Y]``, where ``Y`` (``n_sterile x n_active``) solves
+
+    .. math:: Y = -M_R^{-1} m_D^T + M_R^{-1}\, Y^*\, m_D\, Y ,
+
+    solved by iteration with the bookkeeping ``m_D \sim \epsilon``. The
+    effective mass matrices in orthonormal bases are
+
+    .. math::
+        m_\nu = \left[(1 + Y^\dagger Y)^{1/2}\right]^* m_D Y\,(1 + Y^\dagger Y)^{-1/2},
+        \qquad
+        m_N = \left[(1 + Y Y^\dagger)^{1/2}\right]^* (M_R - m_D^T Y^\dagger)\,
+              (1 + Y Y^\dagger)^{-1/2},
+
+    so that ``W^T M W = diag(m_nu, m_N)`` with the unitary
+    ``W = [[c_l, -Y^\dagger c_h], [Y c_l, c_h]]``, ``c_l = (1+Y^\dagger Y)^{-1/2}``,
+    ``c_h = (1+Y Y^\dagger)^{-1/2}``. The leading term is the usual
+    ``m_nu = -m_D M_R^{-1} m_D^T``.
+
+    Assumptions: ``M_R`` invertible and ``|m_D M_R^{-1}| << 1``. No reality
+    assumption is made; complex conjugation is kept explicitly.
+
+    Parameters:
+    -----------
+    m_D : sp.Matrix
+        Dirac mass matrix (``n_active x n_sterile``)
+    M_R : sp.Matrix
+        Majorana mass matrix (``n_sterile x n_sterile``, symmetric, invertible)
+    order : int, optional
+        Highest power of ``m_D`` kept in ``m_light`` (even, default 4)
+
+    Returns:
+    --------
+    dict
+        ``'m_light'`` and ``'m_heavy'`` (truncated sums), ``'light_terms'`` and
+        ``'heavy_terms'`` (``{power of m_D: matrix}``), ``'Y'`` (truncated
+        active-sterile mixing block) and ``'Y_terms'``
+    """
+    if order < 2 or order % 2:
+        raise ValueError("order must be an even integer >= 2")
+
+    n_active, n_sterile = m_D.shape
+    M_R_inv = M_R.inv()
+    conj = lambda matrix: matrix.applyfunc(sp.conjugate)
+
+    zero_Y = sp.zeros(n_sterile, n_active)
+    Y = [zero_Y.copy() for _ in range(order)]  # Y has odd powers up to order - 1
+    Y[1] = -M_R_inv * m_D.T
+    for power in range(3, order, 2):
+        total = zero_Y.copy()
+        for a in range(1, power - 1, 2):
+            b = power - 1 - a
+            total += conj(Y[a]) * m_D * Y[b]
+        Y[power] = M_R_inv * total
+
+    Y_dagger = [conj(y).T for y in Y]
+    mD_series = [sp.zeros(*m_D.shape), m_D]
+    mDT_series = [sp.zeros(*m_D.T.shape), m_D.T]
+
+    # Light block
+    YdY = _truncated_series_product(Y_dagger, Y, order)
+    sqrt_l = _binomial_matrix_series(YdY, sp.Rational(1, 2), order)
+    inv_sqrt_l = _binomial_matrix_series(YdY, sp.Rational(-1, 2), order)
+    K_light = _truncated_series_product(mD_series, Y, order)
+    light = _truncated_series_product(
+        _truncated_series_product([conj(x) for x in sqrt_l], K_light, order),
+        inv_sqrt_l, order)
+
+    # Heavy block (same accuracy relative to M_R)
+    YYd = _truncated_series_product(Y, Y_dagger, order)
+    sqrt_h = _binomial_matrix_series(YYd, sp.Rational(1, 2), order)
+    inv_sqrt_h = _binomial_matrix_series(YYd, sp.Rational(-1, 2), order)
+    K_heavy = [-x for x in _truncated_series_product(mDT_series, Y_dagger, order)]
+    K_heavy[0] = K_heavy[0] + M_R
+    heavy = _truncated_series_product(
+        _truncated_series_product([conj(x) for x in sqrt_h], K_heavy, order),
+        inv_sqrt_h, order)
+
+    light_terms = {k: light[k] for k in range(2, order + 1, 2)}
+    heavy_terms = {k: heavy[k] for k in range(0, order + 1, 2)}
+    Y_terms = {k: Y[k] for k in range(1, order, 2)}
+
+    return {
+        'm_light': sum(light_terms.values(), sp.zeros(n_active, n_active)),
+        'm_heavy': sum(heavy_terms.values(), sp.zeros(n_sterile, n_sterile)),
+        'light_terms': light_terms,
+        'heavy_terms': heavy_terms,
+        'Y': sum(Y_terms.values(), zero_Y),
+        'Y_terms': Y_terms,
+    }
