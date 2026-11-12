@@ -367,7 +367,8 @@ def experimental_values_2023() -> Dict[str, Dict[str, float]]:
     """
     Return current best-fit experimental values for neutrino parameters (2023).
     
-    Values from global fits (NuFIT 5.2, arXiv:2111.03086).
+    Approximate values from the NuFIT 5.x global fits (cf. arXiv:2111.03086).
+    Kept for backward compatibility; use :func:`nufit_6_0` for current data.
     
     Returns:
     --------
@@ -399,7 +400,101 @@ def experimental_values_2023() -> Dict[str, Dict[str, float]]:
     return values
 
 
-def pmns_from_experimental(ordering: str = 'normal') -> np.ndarray:
+def nufit_6_0(variant: str = 'with_sk') -> Dict[str, Dict]:
+    r"""
+    Three-flavour global-fit results of NuFIT 6.0.
+
+    I. Esteban, M. C. Gonzalez-Garcia, M. Maltoni, I. Martinez-Soler,
+    J. P. Pinheiro, T. Schwetz, "NuFit-6.0: updated global analysis of
+    three-flavor neutrino oscillations", JHEP 12 (2024) 216,
+    arXiv:2410.05380 (Table 1). See http://www.nu-fit.org for updates.
+
+    Each parameter is a tuple ``(bfp, +1sigma, -1sigma, low_3sigma, high_3sigma)``.
+    Best fits and 1-sigma errors are relative to the local minimum of each
+    ordering. ``'delta_chi2'`` is the chi^2 of that ordering above the global
+    minimum.
+
+    Conventions: ``dm21_sq`` is :math:`\Delta m^2_{21}` and ``dm3l_sq`` is
+    :math:`\Delta m^2_{3\ell}`, i.e. :math:`\Delta m^2_{31} > 0` for normal
+    ordering and :math:`\Delta m^2_{32} < 0` for inverted ordering. Both are
+    in **eV^2**. Angles and the Dirac phase are in degrees; ``delta_cp_deg``
+    3-sigma ranges may extend beyond 360 (they wrap around).
+
+    Parameters:
+    -----------
+    variant : {'with_sk', 'without_sk'}
+        ``'with_sk'``: IC24 with the Super-Kamiokande atmospheric chi^2 table
+        (prefers normal ordering, Delta chi^2 = 6.1).
+        ``'without_sk'``: IC19 without SK-atm (inverted ordering marginally
+        preferred, Delta chi^2 = 0.6).
+
+    Returns:
+    --------
+    dict
+        ``{'normal': {...}, 'inverted': {...}}``
+    """
+    e5, e3 = 1e-5, 1e-3
+    tables = {
+        'without_sk': {
+            'normal': {
+                'sin2_theta12': (0.307, 0.012, 0.011, 0.275, 0.345),
+                'theta12_deg': (33.68, 0.73, 0.70, 31.63, 35.95),
+                'sin2_theta23': (0.561, 0.012, 0.015, 0.430, 0.596),
+                'theta23_deg': (48.5, 0.7, 0.9, 41.0, 50.5),
+                'sin2_theta13': (0.02195, 0.00054, 0.00058, 0.02023, 0.02376),
+                'theta13_deg': (8.52, 0.11, 0.11, 8.18, 8.87),
+                'delta_cp_deg': (177.0, 19.0, 20.0, 96.0, 422.0),
+                'dm21_sq': (7.49 * e5, 0.19 * e5, 0.19 * e5, 6.92 * e5, 8.05 * e5),
+                'dm3l_sq': (2.534 * e3, 0.025 * e3, 0.023 * e3, 2.463 * e3, 2.606 * e3),
+                'delta_chi2': 0.6,
+            },
+            'inverted': {
+                'sin2_theta12': (0.308, 0.012, 0.011, 0.275, 0.345),
+                'theta12_deg': (33.68, 0.73, 0.70, 31.63, 35.95),
+                'sin2_theta23': (0.562, 0.012, 0.015, 0.437, 0.597),
+                'theta23_deg': (48.6, 0.7, 0.9, 41.4, 50.6),
+                'sin2_theta13': (0.02224, 0.00056, 0.00057, 0.02053, 0.02397),
+                'theta13_deg': (8.58, 0.11, 0.11, 8.24, 8.91),
+                'delta_cp_deg': (285.0, 25.0, 28.0, 201.0, 348.0),
+                'dm21_sq': (7.49 * e5, 0.19 * e5, 0.19 * e5, 6.92 * e5, 8.05 * e5),
+                'dm3l_sq': (-2.510 * e3, 0.024 * e3, 0.025 * e3, -2.584 * e3, -2.438 * e3),
+                'delta_chi2': 0.0,
+            },
+        },
+        'with_sk': {
+            'normal': {
+                'sin2_theta12': (0.308, 0.012, 0.011, 0.275, 0.345),
+                'theta12_deg': (33.68, 0.73, 0.70, 31.63, 35.95),
+                'sin2_theta23': (0.470, 0.017, 0.013, 0.435, 0.585),
+                'theta23_deg': (43.3, 1.0, 0.8, 41.3, 49.9),
+                'sin2_theta13': (0.02215, 0.00056, 0.00058, 0.02030, 0.02388),
+                'theta13_deg': (8.56, 0.11, 0.11, 8.19, 8.89),
+                'delta_cp_deg': (212.0, 26.0, 41.0, 124.0, 364.0),
+                'dm21_sq': (7.49 * e5, 0.19 * e5, 0.19 * e5, 6.92 * e5, 8.05 * e5),
+                'dm3l_sq': (2.513 * e3, 0.021 * e3, 0.019 * e3, 2.451 * e3, 2.578 * e3),
+                'delta_chi2': 0.0,
+            },
+            'inverted': {
+                'sin2_theta12': (0.308, 0.012, 0.011, 0.275, 0.345),
+                'theta12_deg': (33.68, 0.73, 0.70, 31.63, 35.95),
+                'sin2_theta23': (0.550, 0.012, 0.015, 0.440, 0.584),
+                'theta23_deg': (47.9, 0.7, 0.9, 41.5, 49.8),
+                'sin2_theta13': (0.02231, 0.00056, 0.00056, 0.02060, 0.02409),
+                'theta13_deg': (8.59, 0.11, 0.11, 8.25, 8.93),
+                'delta_cp_deg': (274.0, 22.0, 25.0, 201.0, 335.0),
+                'dm21_sq': (7.49 * e5, 0.19 * e5, 0.19 * e5, 6.92 * e5, 8.05 * e5),
+                'dm3l_sq': (-2.484 * e3, 0.020 * e3, 0.020 * e3, -2.547 * e3, -2.421 * e3),
+                'delta_chi2': 6.1,
+            },
+        },
+    }
+    if variant not in tables:
+        raise ValueError(f"variant must be 'with_sk' or 'without_sk', got {variant!r}")
+    return {ordering: dict(values) for ordering, values in tables[variant].items()}
+
+
+def pmns_from_experimental(ordering: str = 'normal',
+                           data: Optional[Dict[str, Dict]] = None) -> np.ndarray:
     """
     Construct PMNS matrix using experimental best-fit values.
     
@@ -407,12 +502,25 @@ def pmns_from_experimental(ordering: str = 'normal') -> np.ndarray:
     -----------
     ordering : str, optional
         'normal' or 'inverted' mass ordering (default: 'normal')
+    data : dict, optional
+        Global-fit data in the format of :func:`nufit_6_0`. If omitted, the
+        legacy :func:`experimental_values_2023` values are used.
     
     Returns:
     --------
     np.ndarray
         PMNS matrix with experimental values
     """
+    if data is not None:
+        if ordering not in data:
+            raise ValueError(f"Ordering must be 'normal' or 'inverted', got {ordering}")
+        bfp = {key: value[0] for key, value in data[ordering].items()
+               if isinstance(value, tuple)}
+        return pmns_matrix_pdg(np.radians(bfp['theta12_deg']),
+                               np.radians(bfp['theta13_deg']),
+                               np.radians(bfp['theta23_deg']),
+                               np.radians(bfp['delta_cp_deg']))
+
     exp_values = experimental_values_2023()
     
     if ordering not in exp_values:

@@ -10,6 +10,7 @@ Modules:
 - inverse_seesaw: Implementation of Inverse Seesaw mechanism
 - pmns_matrix: PMNS mixing matrix parameterizations and calculations
 - symbolic_diagonalization: Exact symbolic (Takagi) diagonalization of the Type I seesaw matrix
+- data_fit: Confronting the Type I seesaw with (n, m) neutrinos with NuFIT data
 - visualization: Plotting and visualization utilities for mass spectra and mixing
 """
 
@@ -21,3 +22,4 @@ from .seesaw import *
 from .inverse_seesaw import *
 from .pmns_matrix import *
 from .symbolic_diagonalization import *
+from .data_fit import *
