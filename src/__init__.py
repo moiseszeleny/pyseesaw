@@ -10,6 +10,8 @@ Modules:
 - inverse_seesaw: Implementation of Inverse Seesaw mechanism
 - pmns_matrix: PMNS mixing matrix parameterizations and calculations
 - symbolic_diagonalization: Exact symbolic (Takagi) diagonalization of the Type I seesaw matrix
+- galois_analysis: Galois groups of the Type I seesaw characteristic polynomial
+- exact_seesaw_numeric: High-precision exact Casas-Ibarra parametrization and observables
 - visualization: Plotting and visualization utilities for mass spectra and mixing
 """
 
@@ -21,3 +23,5 @@ from .seesaw import *
 from .inverse_seesaw import *
 from .pmns_matrix import *
 from .symbolic_diagonalization import *
+from .galois_analysis import *
+from .exact_seesaw_numeric import *

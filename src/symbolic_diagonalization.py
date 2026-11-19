@@ -63,6 +63,7 @@ __all__ = [
     "verify_takagi",
     "expression_size",
     "lambdify_large",
+    "nested_definitions",
     "numeric_mass_points",
     "feasibility_probe",
     "seesaw_block_expansion",
@@ -175,8 +176,52 @@ def solve_quartic_ferrari(coefficients: Sequence[sp.Expr]) -> List[sp.Expr]:
     ]
 
 
+def _solvable_decomposition(poly: sp.Poly) -> Optional[List[sp.Poly]]:
+    """
+    Functional decomposition ``poly = g_1(g_2(...))`` into components of degree
+    ``<= 4``, if ``poly`` has degree ``> 4`` and one exists (else ``None``).
+    """
+    if poly.degree() <= 4:
+        return None
+    try:
+        components = poly.decompose()
+    except (sp.PolynomialError, NotImplementedError):
+        return None
+    if len(components) > 1 and all(c.degree() <= 4 for c in components):
+        return components
+    return None
+
+
+def _roots_of_composition(components: Sequence[sp.Poly]) -> List[sp.Expr]:
+    """
+    Real roots of ``g_1(g_2(...(x)))``: roots ``y`` of the outer component,
+    then the roots of ``g_2(x) = y``, and so on. Assumes all roots real (then
+    every intermediate equation has real roots). Grouped by outer root, not
+    ascending overall.
+    """
+    values = _roots_from_coefficients(
+        [c / components[0].LC() for c in components[0].all_coeffs()][1:]
+    )
+    for component in components[1:]:
+        coefficients = component.all_coeffs()
+        leading = coefficients[0]
+        new_values = []
+        for value in values:
+            shifted = coefficients[:-1] + [coefficients[-1] - value]
+            new_values.extend(_roots_from_coefficients([c / leading for c in shifted][1:]))
+        values = new_values
+    return values
+
+
 def _roots_of_irreducible(poly: sp.Poly) -> List[sp.Expr]:
-    """Closed-form real roots of one (irreducible) factor, ascending."""
+    """
+    Closed-form real roots of one (irreducible) factor: ascending for degree
+    ``<= 4``; grouped by the outer roots for a solvable functional
+    decomposition (e.g. degenerate heavy neutrinos, ``P = Q(lambda(lambda-M))``).
+    """
+    components = _solvable_decomposition(poly)
+    if components is not None:
+        return _roots_of_composition(components)
     return _roots_from_coefficients([c / poly.LC() for c in poly.all_coeffs()][1:])
 
 
@@ -214,7 +259,8 @@ def solve_reduced_charpoly(
 
     The polynomial is first factorized over its symbolic coefficients (special
     textures often factorize even when the generic case does not); each
-    irreducible factor of degree ``<= 4`` is solved with a manifestly real
+    irreducible factor of degree ``<= 4`` (or of higher degree with a functional
+    decomposition into components of degree ``<= 4``) is solved with a manifestly real
     formula (quadratic, trigonometric cubic, Ferrari quartic).
 
     Assumes all roots are real, as for ``det(lambda - M)`` with ``M`` real
@@ -238,7 +284,7 @@ def solve_reduced_charpoly(
     Raises:
     -------
     NotSolvableInRadicals
-        If an irreducible factor has degree ``>= 5``
+        If an irreducible factor has degree ``>= 5`` and no such decomposition
     """
     if not isinstance(poly, sp.Poly):
         if lamb is None:
@@ -581,8 +627,9 @@ def direct_diagonalization(
         (roots, ordered as ``'masses'``), ``'masses'`` (massive states only,
         light first), ``'U'`` (full mixing matrix, massless columns first),
         ``'hermitian_square'``, ``'factorized'``. If the polynomial factorizes
-        (special textures), the states are grouped by factor instead of being
-        ordered light-first, and real-case masses are given as ``|lambda_i|``.
+        or decomposes functionally (special textures, degenerate ``M_R``), the
+        states are grouped by factor instead of being ordered light-first, and
+        real-case masses are given as ``|lambda_i|``.
 
     Raises:
     -------
@@ -594,7 +641,11 @@ def direct_diagonalization(
     lamb = sp.Symbol("lambda", real=True)
     polynomial = model.reduced_charpoly(hermitian_square=hermitian_square, lamb=lamb)
     pairs = _roots_with_factors(polynomial, try_factor)
-    factorized = len({factor for _, factor in pairs}) > 1
+    # A solvable functional decomposition also yields roots that are grouped
+    # rather than ascending: treat it like a factorization
+    factorized = len({factor for _, factor in pairs}) > 1 or any(
+        _solvable_decomposition(factor) is not None for _, factor in pairs
+    )
     mass_matrix = model.full_mass_matrix_symbolic()
     operator = mass_matrix.H * mass_matrix if hermitian_square else mass_matrix
 
@@ -1160,6 +1211,127 @@ def _dag_cse(
                 stack.append((node, True))
                 stack.extend((arg, False) for arg in node.args if arg not in mapping)
     return replacements, [mapping[sp.sympify(root)] for root in expressions]
+
+
+def nested_definitions(
+    expressions: Sequence[sp.Expr],
+    names: Sequence[Union[str, sp.Symbol]],
+    symbol_prefix: str = "w",
+    max_inline: int = 40,
+    min_shared: int = 4,
+) -> Dict[str, object]:
+    r"""
+    Readable chain of definitions for large nested closed forms.
+
+    The closed forms of the cubic and quartic cases are short as straight-line
+    programs but astronomically long written out (see
+    :func:`expression_size`). This rewrites them as a sequence
+
+    .. math:: w_1 = f_1(\text{parameters}),\; w_2 = f_2(w_1, \dots),\; \dots,
+              \; \text{name}_i = g_i(w_j)
+
+    suitable for a paper. Unlike :func:`_dag_cse`, which names every node, a
+    subexpression gets its own symbol only if it is shared (used at least
+    twice and of inline size at least ``min_shared``) or if writing it inline
+    would exceed ``max_inline`` nodes. The traversal visits each distinct
+    subexpression once, so it is linear in the DAG size (no ``sp.cse``,
+    ``count_ops`` or simplification of the large expressions).
+
+    Parameters:
+    -----------
+    expressions : sequence of sp.Expr
+        Expressions to export (e.g. masses and mixing matrix entries)
+    names : sequence of str or sp.Symbol
+        Name of each expression on the left-hand side of its final definition
+    symbol_prefix : str, optional
+        Base name of the intermediate symbols (``w_1, w_2, ...``)
+    max_inline : int, optional
+        Largest subexpression (in tree nodes) written inline
+    min_shared : int, optional
+        Smallest shared subexpression that is given its own symbol
+
+    Returns:
+    --------
+    dict
+        ``'definitions'`` (list of ``(symbol, expr)`` in evaluation order;
+        outputs that reappear inside other outputs are defined here under their
+        own name), ``'outputs'`` (list of ``(name, expr)`` for the others),
+        ``'latex'`` (an ``align*`` body, one definition per line) and
+        ``'n_definitions'``
+    """
+    if len(expressions) != len(names):
+        raise ValueError("expressions and names must have the same length")
+    roots = [sp.sympify(e) for e in expressions]
+
+    # Post-order over distinct nodes, with reference counts
+    order: List[sp.Basic] = []
+    references: Dict[sp.Basic, int] = {}
+    visited: set = set()
+    for root in roots:
+        stack = [(root, False)]
+        while stack:
+            node, expanded = stack.pop()
+            if expanded:
+                order.append(node)
+                continue
+            if node in visited:
+                continue
+            visited.add(node)
+            stack.append((node, True))
+            for arg in node.args:
+                references[arg] = references.get(arg, 0) + 1
+                if arg not in visited:
+                    stack.append((arg, False))
+
+    # Decide which nodes get a symbol, bottom-up
+    inline_size: Dict[sp.Basic, int] = {}
+    named: Dict[sp.Basic, sp.Symbol] = {}
+    rebuilt: Dict[sp.Basic, sp.Expr] = {}
+    definitions: List[Tuple[sp.Symbol, sp.Expr]] = []
+    root_names: Dict[sp.Basic, sp.Symbol] = {}
+    for root, name in zip(roots, names):
+        root_names.setdefault(root, name if isinstance(name, sp.Symbol) else sp.Symbol(name))
+    for node in order:
+        if not node.args:
+            inline_size[node], rebuilt[node] = 1, node
+            continue
+        arguments = [named.get(arg, rebuilt[arg]) for arg in node.args]
+        size = 1 + sum(1 if arg in named else inline_size[arg] for arg in node.args)
+        expression = node.func(*arguments)
+        shared = references.get(node, 0) >= 2 and size >= min_shared
+        if node in root_names and references.get(node, 0) >= 1 and size >= min_shared:
+            # an output reused inside other outputs is referred to by its name
+            symbol = root_names[node]
+            definitions.append((symbol, expression))
+            named[node] = symbol
+            inline_size[node] = 1
+        elif (shared or size > max_inline) and node not in root_names:
+            n_intermediates = len(definitions) - len(set(named.values()) & set(root_names.values()))
+            symbol = sp.Symbol(f"{symbol_prefix}_{n_intermediates + 1}")
+            definitions.append((symbol, expression))
+            named[node] = symbol
+            inline_size[node] = 1
+        else:
+            inline_size[node] = size
+        rebuilt[node] = expression
+
+    outputs = []
+    for root, name in zip(roots, names):
+        symbol = name if isinstance(name, sp.Symbol) else sp.Symbol(name)
+        value = named.get(root, rebuilt[root])
+        if value != symbol:  # outputs already defined in the chain are skipped
+            outputs.append((symbol, value))
+
+    lines = [
+        f"{sp.latex(symbol)} &= {sp.latex(expression)}"
+        for symbol, expression in definitions + outputs
+    ]
+    return {
+        "definitions": definitions,
+        "outputs": outputs,
+        "latex": " \\\\\n".join(lines),
+        "n_definitions": len(definitions),
+    }
 
 
 def _dag_free_symbols(expressions: Sequence[sp.Expr]) -> set:
