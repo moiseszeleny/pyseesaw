@@ -37,6 +37,8 @@ src/
 ├── inverse_seesaw.py          # Inverse Seesaw mechanism
 ├── pmns_matrix.py             # PMNS matrix parameterizations
 ├── symbolic_diagonalization.py # Exact symbolic (Takagi) diagonalization of the Type I seesaw
+├── galois_analysis.py          # Galois groups of the seesaw characteristic polynomial
+├── exact_seesaw_numeric.py     # High-precision exact Casas-Ibarra and Takagi numerics
 └── visualization.py           # Plotting and analysis tools
 
 examples/
@@ -52,7 +54,10 @@ notebooks/
 
 tests/
 ├── test_matrix_utils.py               # Unit tests
-└── test_symbolic_diagonalization.py   # Symbolic results checked numerically
+├── test_symbolic_diagonalization.py   # Symbolic results checked numerically
+└── test_galois_analysis.py            # Galois groups, decompositions, exact numerics
+
+paper_results/                          # Tables, formulas and figures for the paper
 ```
 
 ## 🧩 Exact symbolic diagonalization
@@ -65,7 +70,16 @@ tests/
   `n (m - 1)` phases of `m_D` are physical. For `n > m` the problem reduces to `(m, m)`.
 - **Direct** (`direct_diagonalization`): masses and `U` from `m_D`, `M_R`. The masses are roots
   of a degree-`k` polynomial, so this works only for `k <= 4`: `(n,1)`, `(1,2)`, `(2,2)`,
-  `(3,2)`, `(1,3)`. For `(2,3)` and `(3,3)` no formula in radicals exists.
+  `(3,2)`, `(1,3)`. For `(2,3)` and `(3,3)` no formula in radicals exists (Galois groups
+  `S5`, `S6`). Factors of higher degree that decompose functionally into pieces of degree
+  `<= 4` are also solved, e.g. `(3,3)` with degenerate heavy neutrinos and real `m_D`.
+- **Galois groups** (`src/galois_analysis.py`): `generic_galois_group(n, m, cp, texture)`
+  computes and proves the Galois group of the reduced characteristic polynomial, using exact
+  rational specializations as lower bounds and the generic factorization or functional
+  decomposition as upper bounds. It also reports whether the roots can be written with real
+  radicals. `texture_scan` classifies every texture-zero pattern of `m_D`, and
+  `named_textures` lists degenerate `M_R`, diagonal and mu-tau symmetric `m_D`, and the FGY
+  textures.
 - **Semi-explicit** (`semi_explicit_diagonalization`): `U` in terms of the parameters and the
   masses; works for any `(n, m)`.
 - **Inverse** (`exact_seesaw_parametrization`, `arrowhead_inverse_parameters`): `m_D`, `M_R`
@@ -80,6 +94,13 @@ tests/
   ~10^3 distinct subexpressions. `expression_size` reports both numbers and
   `lambdify_large` evaluates such results quickly; `sp.count_ops`, `.free_symbols`,
   `sp.cse` and plain `sp.lambdify` walk the written-out tree and do not finish.
+  `nested_definitions` writes such a result as a short chain of LaTeX definitions.
+- **High-precision numerics** (`src/exact_seesaw_numeric.py`): `mpmath` versions of the
+  Takagi factorization, of the exact and leading-order Casas-Ibarra parametrizations, and of
+  the oscillation observables. Physical hierarchies need them: in double precision the light
+  masses of the full matrix lose about `log10(M/m)` digits.
+- **Paper results** (`paper_results/`): scripts that regenerate the Galois tables, the
+  closed-form appendices and the (3,2) minimal seesaw figures; see `paper_results/README.md`.
 
 ```python
 from src.seesaw import SymbolicSeesawTypeI
